@@ -6,6 +6,7 @@ export default defineConfig({
     'hal/index': 'src/hal/index.ts',
     'plain/index': 'src/plain/index.ts',
     'vue/index': 'src/vue/index.ts',
+    'pinia/index': 'src/pinia/index.ts',
     'testing/index': 'src/testing/index.ts',
     'testing/vitest': 'src/testing/vitest.ts',
   },
