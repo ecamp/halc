@@ -49,7 +49,6 @@ describe('HAL normalizer', () => {
     expect(records.map((record) => [record.uri, record.meta.type])).toEqual([
       ['/camps/1', 'Camp'],
       ['/periods/2', 'Period'],
-      ['/periods/2', 'Period'],
     ])
     expect(records[0].data).toEqual({
       id: 1,
@@ -183,5 +182,34 @@ describe('HAL adapter', () => {
         context
       )[0].meta.type
     ).toBe('Thing')
+  })
+})
+
+describe('resources occurring several times in one document', () => {
+  it('are merged, the outermost occurrence winning', () => {
+    const records = normalize({
+      _links: { self: { href: '/api/camps/1' } },
+      title: 'full',
+      motto: 'm',
+      _embedded: {
+        owner: {
+          _links: { self: { href: '/api/users/1' } },
+          name: 'u',
+          _embedded: {
+            camps: [
+              { _links: { self: { href: '/api/camps/1' } }, title: 'partial', extra: 1 },
+            ],
+          },
+        },
+      },
+    })
+
+    expect(records.map((record) => record.uri)).toEqual(['/camps/1', '/users/1'])
+    expect(records[0].data).toEqual({
+      title: 'full',
+      motto: 'm',
+      extra: 1,
+      owner: { href: '/users/1' },
+    })
   })
 })

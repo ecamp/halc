@@ -183,6 +183,7 @@ class ResourceWrapper {
 
   toJSON(): Record<string, unknown> {
     const { client, uri } = this[INTERNAL]
+    client.reactivity.track(uri)
     const record = client.store.get(uri)
     return record
       ? { ...currentData(record), _meta: { self: uri } }

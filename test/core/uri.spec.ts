@@ -95,3 +95,29 @@ describe('createUrlResolver', () => {
     expect(resolve('/camps/1#periods')).toBe('http://localhost:3000/api/camps/1')
   })
 })
+
+describe('createUriNormalizer edge cases', () => {
+  it('treats an explicit default port like no port', () => {
+    const normalize = createUriNormalizer('http://localhost/api')
+    expect(normalize('http://localhost:80/api/x')).toBe('/x')
+    expect(
+      createUriNormalizer('https://example.com/api')('https://example.com:443/api/x')
+    ).toBe('/x')
+  })
+
+  it('resolves a relative base URL against the page origin in browsers', () => {
+    const globals = globalThis as { location?: unknown }
+    const previous = globals.location
+    globals.location = { origin: 'https://app.example.com' }
+    try {
+      const normalize = createUriNormalizer('/api')
+      expect(normalize('https://app.example.com/api/x')).toBe('/x')
+      expect(normalize('/api/x')).toBe('/x')
+      expect(normalize('https://other.example.com/api/x')).toBe(
+        'https://other.example.com/api/x'
+      )
+    } finally {
+      globals.location = previous
+    }
+  })
+})

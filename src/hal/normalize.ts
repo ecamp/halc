@@ -176,5 +176,25 @@ export function normalizeHal(
   const normalizer = new Normalizer(context, options)
   const self = selfHref(body)
   normalizer.resource(body, self === undefined ? uri : context.normalizeUri(self), '$')
-  return normalizer.records
+  return mergeDuplicates(normalizer.records)
+}
+
+/**
+ * A resource can occur several times in one document, e.g. embedded again deeper down with fewer
+ * fields. Its occurrences are merged into one record, at the position of the first one: fields
+ * of earlier (less deeply nested) occurrences win, and fields only some occurrences have are kept.
+ */
+function mergeDuplicates(records: EntityRecord[]): EntityRecord[] {
+  const byUri = new Map<string, EntityRecord>()
+  const merged: EntityRecord[] = []
+  for (const record of records) {
+    const first = byUri.get(record.uri)
+    if (first) {
+      first.data = { ...record.data, ...first.data }
+    } else {
+      byUri.set(record.uri, record)
+      merged.push(record)
+    }
+  }
+  return merged
 }

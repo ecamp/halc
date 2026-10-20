@@ -48,8 +48,24 @@ export type UriNormalizer = (uri: string) => string
  * and `/api/books/1?a=2&b=1` both normalize to `/books/1?a=2&b=1`, and `/api/` to `''`.
  * URIs on other origins are only sorted.
  */
+/** The origin of the current page, if running in a browser. */
+function pageOrigin(): string | undefined {
+  const location = (globalThis as { location?: { origin?: unknown } }).location
+  return typeof location?.origin === 'string' && location.origin !== 'null'
+    ? location.origin
+    : undefined
+}
+
+/** Scheme and authority of an absolute URI, e.g. `https://example.com:8080`. */
+const AUTHORITY = /^[a-z][a-z\d+\-.]*:\/\/[^/?#]*/i
+
 export function createUriNormalizer(baseUrl: string | null | undefined): UriNormalizer {
-  const base = baseUrl ? parseAbsolute(baseUrl) : undefined
+  // A relative base URL (e.g. `/api`) refers to the origin of the page, so absolute URLs on that
+  // origin normalize to the same keys as relative ones.
+  const pageBase = baseUrl && !parseAbsolute(baseUrl) && pageOrigin()
+  const base = baseUrl
+    ? parseAbsolute(pageBase ? new URL(baseUrl, pageBase).href : baseUrl)
+    : undefined
   const origin = base?.origin
   const pathPrefix = (base ? base.pathname : (baseUrl ?? '')).replace(/\/+$/, '')
 
@@ -59,7 +75,8 @@ export function createUriNormalizer(baseUrl: string | null | undefined): UriNorm
     const absolute = parseAbsolute(normalized)
     if (absolute) {
       if (absolute.origin !== origin) return normalized
-      const relative = normalized.slice(absolute.origin.length)
+      // Not `absolute.origin.length`: the URI may contain a default port that the origin omits.
+      const relative = normalized.replace(AUTHORITY, '')
       const stripped = stripPathPrefix(relative, pathPrefix)
       // Same origin, but outside the API: only an absolute URL resolves to it correctly.
       if (stripped === relative && pathPrefix) return normalized
