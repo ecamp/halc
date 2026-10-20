@@ -32,7 +32,11 @@ describe('wrappers', () => {
     api.mock.patch(camp)
     const loaded = await api.get(camp._meta.self)._meta.load
 
-    expect(Object.keys(loaded)).toEqual(['title', 'creator'])
+    expect(Object.keys(loaded)).toEqual(['_meta', 'title', 'creator'])
+    // Like in hal-json-vuex, a spread copy keeps _meta and working relations.
+    const copy: Record<string, any> = { ...loaded, extra: true }
+    expect(copy._meta.self).toBe('/camps/000000000002')
+    expect(copy.creator()._meta.self).toBe('/users/000000000001')
     expect(loaded.creator).toBeTypeOf('function')
     expect(loaded.creator).toBe(loaded.creator)
     expect(loaded.constructor.name).toBe('Camp')
@@ -157,7 +161,7 @@ describe('placeholders after loading', () => {
     await placeholder._meta.load
 
     expect('title' in placeholder).toBe(true)
-    expect(Object.keys(placeholder)).toEqual(['title', 'creator'])
+    expect(Object.keys(placeholder)).toEqual(['_meta', 'title', 'creator'])
     const { title, creator } = { ...placeholder }
     expect(title).toBe('x')
     expect(creator()._meta.self).toBe('/users/000000000001')

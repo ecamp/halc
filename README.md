@@ -149,7 +149,8 @@ book.$hrefs('chapters') // Promise<string[]>: every URI of a to-many relation
 book.$hrefsSync('chapters') // string[] | undefined
 ```
 
-Wrappers are plain objects: spreading and `JSON.stringify` work, and Vue never makes them reactive
+Wrappers are plain objects: spreading (which keeps `_meta` and the relation functions) and
+`JSON.stringify` work, and Vue never makes them reactive
 (they are marked raw). Their data is **frozen**: change data with `$patch`, not by mutating objects.
 A wrapper always reads the current data of its record, but `api.get(uri)` returns a new wrapper after
 every change. Read resources in templates, computed properties and watchers rather than storing

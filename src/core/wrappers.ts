@@ -233,6 +233,16 @@ function propertyDescriptor(key: string): PropertyDescriptor {
 
 const RESERVED_KEYS = new Set(['_meta', 'items', 'allItems'])
 
+// `_meta` is an own enumerable property (as in hal-json-vuex), so `{ ...entity }` keeps it.
+const metaDescriptor: PropertyDescriptor = {
+  get(this: ResourceWrapper) {
+    const internals = this[INTERNAL]
+    return (internals.meta ??= new ResourceMetaView(internals.client, internals.uri))
+  },
+  enumerable: true,
+  configurable: true,
+}
+
 /** Builds and caches wrapper classes per entity type, so derived getters can live on them. */
 export class WrapperFactory {
   private readonly classes = new Map<string, typeof ResourceWrapper>()
@@ -290,7 +300,10 @@ export class WrapperFactory {
     const cacheKey = keys.join('\u0000')
     let descriptors = this.descriptorSets.get(cacheKey)
     if (!descriptors) {
-      descriptors = Object.fromEntries(keys.map((key) => [key, propertyDescriptor(key)]))
+      descriptors = {
+        _meta: metaDescriptor,
+        ...Object.fromEntries(keys.map((key) => [key, propertyDescriptor(key)])),
+      }
       this.descriptorSets.set(cacheKey, descriptors)
     }
     return descriptors

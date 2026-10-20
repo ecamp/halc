@@ -34,7 +34,7 @@ describe('preprocessors', () => {
     const loaded = await api.get(camp._meta.self)._meta.load
 
     expect(loaded.derived).toBe(1)
-    expect({ ...loaded }).toEqual({ title: 'x' })
+    expect({ ...loaded }).toEqual({ _meta: loaded._meta, title: 'x' })
     expect(JSON.stringify(loaded)).toBe(
       '{"title":"x","_meta":{"self":"/camps/000000000001"}}'
     )
