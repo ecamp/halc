@@ -1,13 +1,10 @@
+export { createHalc, HalcClient } from './client.js'
 export { ApiError, type ApiErrorDetails } from './errors.js'
 export { MemoryStore } from './memoryStore.js'
 export { noopReactivity } from './noopReactivity.js'
 export { createFetchTransport, type FetchTransportOptions } from './transport.js'
-export {
-  createUriNormalizer,
-  createUrlResolver,
-  sortQueryParams,
-  type UriNormalizer,
-} from './uri.js'
+export { createUriNormalizer, sortQueryParams, type UriNormalizer } from './uri.js'
+export { expandTemplate } from './template.js'
 export { defaultRetryOptions, type RetryOptions } from './retry.js'
 export {
   applyMetaPatch,
@@ -39,3 +36,4 @@ export type {
   Signal,
   StoreAdapter,
 } from './adapters.js'
+export type * from './types.js'
