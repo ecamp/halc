@@ -26,6 +26,11 @@ describe('type detection', () => {
     ['/scheduleEntries/1', '/scheduleEntries/{id}', 'ScheduleEntry'],
     ['/users/018f4d3a-7c1b-7e2a-9f00-0123456789ab', '/users/{id}', 'User'],
     ['/users/01ARZ3NDEKTSV4RRFFQ69G5FAV', '/users/{id}', 'User'],
+    // The examples from the README
+    ['/books/4b2c6f1a9e3d', '/books/{id}', 'Book'],
+    ['/chapters?book=%2Fapi%2Fbooks%2F4b2c6f1a9e3d', '/chapters', 'Chapter'],
+    ['/library/audio_books/9f8e7d6c5b4a', '/library/audio_books/{id}', 'AudioBook'],
+    ['/books/4b2c6f1a9e3d/categories', '/books/{id}/categories', 'Category'],
   ])('detects %j as %j / %j', (uri, resource, type) => {
     expect(resourceOf(uri)).toBe(resource)
     expect(detectType(uri, {})).toBe(type)

@@ -7,25 +7,25 @@ import '../src/testing/vitest.js'
 it('runs the README testing example', async () => {
   resetFixtureIds()
   const api = createMockApi({ adapter: hal })
-  const camp = fixture('Camp', {
-    title: 'Summer camp',
-    activities: [
-      fixture('Activity', { title: 'Hike' }),
-      fixture('Activity', { title: 'Campfire' }),
+  const book = fixture('Book', {
+    title: 'The Hobbit',
+    chapters: [
+      fixture('Chapter', { title: 'An Unexpected Party' }),
+      fixture('Chapter', { title: 'Roast Mutton' }),
     ],
   })
-  expect(camp._meta.self).toBe('/api/camps/000000000003')
-  api.mock.get(camp)
-  api.mock.get(camp.activities as typeof camp)
-  api.mock.patch(camp).reply(200, (current: any) => ({ ...current, title: 'Renamed' }))
+  expect(book._meta.self).toBe('/api/books/000000000003')
+  api.mock.get(book)
+  api.mock.get(book.chapters as typeof book)
+  api.mock.patch(book).reply(200, (current: any) => ({ ...current, title: 'Renamed' }))
 
-  const loaded = await api.get(camp._meta.self)._meta.load
-  await loaded.activities()._meta.load
-  expect(loaded.activities().items).toHaveLength(2)
+  const loaded = await api.get(book._meta.self)._meta.load
+  await loaded.chapters()._meta.load
+  expect(loaded.chapters().items).toHaveLength(2)
   await loaded.$patch({ title: 'Renamed' })
   expect(api.mock.requests).toMatchRequests([
-    { method: 'GET', type: 'Camp' },
-    { method: 'GET', type: 'Activity' },
-    { method: 'PATCH', type: 'Camp', body: { title: 'Renamed' } },
+    { method: 'GET', type: 'Book' },
+    { method: 'GET', type: 'Chapter' },
+    { method: 'PATCH', type: 'Book', body: { title: 'Renamed' } },
   ])
 })

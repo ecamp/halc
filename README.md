@@ -6,10 +6,10 @@ halc loads resources from a HAL API, keeps them in a normalized store and hands 
 as plain objects with relation functions:
 
 ```js
-const camp = api.get('/camps/1')
-camp._meta.loading // true at first, then false
-camp.activities().items // [] while loading, then the activities
-await camp.$patch({ title: 'Winter camp' }) // optimistic, sends only what changed
+const book = api.get('/books/1')
+book._meta.loading // true at first, then false
+book.chapters().items // [] while loading, then the chapters
+await book.$patch({ title: 'There and Back Again' }) // optimistic, sends only what changed
 ```
 
 It is the successor of [hal-json-vuex](https://github.com/ecamp/hal-json-vuex) and
@@ -19,7 +19,7 @@ TypeScript ([RFC](https://github.com/ecamp/ecamp3/issues/11062)):
 - **Same interface as hal-json-vuex** for the common calls, see [Migrating](#migrating-from-hal-json-vuex).
 - **Modular**: store (Vuex, Pinia, in-memory, read-only snapshot), reactivity (Vue or none) and API
   format (HAL) are adapters behind small interfaces. The core depends on none of them.
-- **Zero-config**: entity types (`Camp`, `ScheduleEntry`, …) are detected at runtime from self links.
+- **Zero-config**: entity types (`Book`, `AudioBook`, …) are detected at runtime from self links.
 - **Fast**: one store write per response, reactivity only per entity version, wrappers are cached
   plain objects and `items` are plain arrays.
 - **Optimistic mutations** with rollback; `$patch` sends only the fields that changed.
@@ -54,7 +54,7 @@ optional peer dependencies: install the ones you use.
 
 ## Setup
 
-### Vue 3 with Vuex (like eCamp)
+### Vue 3 with Vuex
 
 ```js
 import { createHalc, createFetchTransport } from 'halc'
@@ -82,7 +82,7 @@ import { createHalc } from 'halc'
 import { hal } from 'halc/hal'
 
 const api = createHalc({ adapter: hal, baseUrl: 'https://example.com/api' })
-const camp = await api.get('/camps/1')._meta.load
+const book = await api.get('/books/1')._meta.load
 ```
 
 ### Options
@@ -90,7 +90,7 @@ const camp = await api.get('/camps/1')._meta.load
 | Option                   | Default             | Description                                                                          |
 | ------------------------ | ------------------- | ------------------------------------------------------------------------------------ |
 | `adapter`                | (required)          | The API format, `hal` from `halc/hal`                                                |
-| `baseUrl`                |                     | Absolute URL of the API root. It is removed from URIs, so `_meta.self` is `/camps/1` |
+| `baseUrl`                |                     | Absolute URL of the API root. It is removed from URIs, so `_meta.self` is `/books/1` |
 | `store`                  | `new MemoryStore()` | Where records live                                                                   |
 | `reactivity`             | no-op               | Who is notified about changes; `halcVue()` installs Vue reactivity                   |
 | `transport`              | `fetch`             | Sends requests; `createFetchTransport({ fetch, credentials })` or your own           |
@@ -125,27 +125,27 @@ A wrapper exposes the properties of a resource as plain properties, relations as
 small API whose names start with `$` or `_`:
 
 ```js
-camp.title // a property
-camp.creator() // a to-one relation: another wrapper
-camp.activities() // a to-many relation: a collection
-camp.activities({ period: '/periods/1' }) // a templated link, expanded with these parameters
-camp['ht:author']() // or camp.$rel('ht:author'), for relation names that are no identifiers
+book.title // a property
+book.author() // a to-one relation: another wrapper
+book.chapters() // a to-many relation: a collection
+book.reviews({ rating: 5 }) // a templated link, expanded with these parameters
+book['ht:publisher']() // or book.$rel('ht:publisher'), for relation names that are no identifiers
 
-camp._meta.self // '/camps/1' (the API base URL removed)
-camp._meta.selfUrl // 'https://example.com/api/camps/1'
-camp._meta.load // Promise of the loaded wrapper, rejects with an ApiError
-camp._meta.loading // true until the first load finished (not during reloads)
-camp._meta.type // 'Camp', detected from the self link
-camp._meta.links // the raw relations: { creator: { href: '/users/1' }, … }
-camp._meta.dirty // optimistic changes not yet confirmed by the API
-camp._meta.deleting // true while a DELETE is in flight
-camp._meta.error // the ApiError of the last failed load or mutation
+book._meta.self // '/books/1' (the API base URL removed)
+book._meta.selfUrl // 'https://example.com/api/books/1'
+book._meta.load // Promise of the loaded wrapper, rejects with an ApiError
+book._meta.loading // true until the first load finished (not during reloads)
+book._meta.type // 'Book', detected from the self link
+book._meta.links // the raw relations: { author: { href: '/authors/1' }, … }
+book._meta.dirty // optimistic changes not yet confirmed by the API
+book._meta.deleting // true while a DELETE is in flight
+book._meta.error // the ApiError of the last failed load or mutation
 
-camp.$reload()
-camp.$href('creator') // Promise<string | undefined>, waits for the camp to load
-camp.$hrefSync('creator') // string | undefined, never sends a request
-camp.$hrefs('activities') // Promise<string[]>: every URI of a to-many relation
-camp.$hrefsSync('activities') // string[] | undefined
+book.$reload()
+book.$href('author') // Promise<string | undefined>, waits for the book to load
+book.$hrefSync('author') // string | undefined, never sends a request
+book.$hrefs('chapters') // Promise<string[]>: every URI of a to-many relation
+book.$hrefsSync('chapters') // string[] | undefined
 ```
 
 Wrappers are plain objects: spreading and `JSON.stringify` work, and Vue never makes them reactive
@@ -157,10 +157,10 @@ wrappers in `data()`.
 ### Collections
 
 ```js
-const activities = camp.activities()
-activities.items // the items without those being deleted: a frozen plain array
-activities.allItems // including those being deleted
-await activities.$loadItems() // waits until every item settled
+const chapters = book.chapters()
+chapters.items // the items without those being deleted: a frozen plain array
+chapters.allItems // including those being deleted
+await chapters.$loadItems() // waits until every item settled
 ```
 
 `items` is `[]` while the collection loads, never `undefined`. Items that are not in the store are
@@ -168,14 +168,14 @@ loaded on access (with `avoidNPlusOneRequests`, the collection itself is reloade
 that the API embeds them). `$loadItems()` settles per item: an item that fails gets `_meta.error`, the
 others are unaffected, and it only rejects if every item failed.
 
-Embedded lists without a URI of their own (e.g. periods embedded into a camp) are **virtual
-collections**: their `_meta.self` is `'/camps/1#periods'`, `api.get('/camps/1#periods')` works, and
-reloading them reloads the camp. They cannot be posted to.
+Embedded lists without a URI of their own (e.g. chapters embedded into a book) are **virtual
+collections**: their `_meta.self` is `'/books/1#chapters'`, `api.get('/books/1#chapters')` works, and
+reloading them reloads the book. They cannot be posted to.
 
 ### Placeholders
 
 While a resource is loading, `api.get()` and relation functions return placeholders, so that chains
-like `api.get(uri).camp().periods().items` work right away:
+like `api.get(uri).author().books().items` work right away:
 
 - `_meta.loading` is `true`, `_meta.self` is the URI (`undefined` for relations of unloaded
   resources, whose URI is not known yet), `items` is `[]`, and `_meta.load` resolves once the data
@@ -195,9 +195,9 @@ await api.post(collectionOrUri, data, options) // resolves to the created resour
 await api.patch(uriOrEntity, data, options) // resolves to the updated resource
 await api.del(uriOrEntity) // resolves once the resource and its references are updated
 // or on wrappers:
-await activities.$post({ title: 'Hike' })
-await activity.$patch({ title: 'Swim' })
-await activity.$del()
+await chapters.$post({ title: 'Prologue' })
+await chapter.$patch({ title: 'Epilogue' })
+await chapter.$del()
 ```
 
 Mutations are **optimistic** by default: the change is visible at once and rolled back if the API
@@ -213,7 +213,7 @@ lists the ones in flight.
 - **POST** adds a temporary item (`urn:tmp:…`) to the collection, replaces it with the created
   resource when the API answers, and then reloads the collection, so server-side ordering and filters
   win (`{ reload: false }` skips that). A `204` with a `Location` header loads that URI. Post to the
-  URI of the collection you display (e.g. `camp.materialLists()`) to see the new item at once.
+  URI of the collection you display (e.g. `book.chapters()`) to see the new item at once.
 - **DELETE** hides the item from `items` (not from `allItems`) while the request runs. Afterwards,
   everything that referenced the resource is reloaded and the resource is removed from the store.
 
@@ -223,12 +223,12 @@ Every failure rejects with an `ApiError`:
 
 ```js
 try {
-  await camp.$patch({ title: '' })
+  await book.$patch({ title: '' })
 } catch (error) {
   error.method // 'PATCH'
-  error.uri // '/camps/1'
+  error.uri // '/books/1'
   error.status // 422 (undefined for network errors)
-  error.type // 'Camp'
+  error.type // 'Book'
   error.data // the parsed body, e.g. problem details with violations
   error.bodyExcerpt // the beginning of the raw body
   error.response // { status, headers, data }, like an axios response
@@ -255,14 +255,14 @@ Preprocessors add derived fields to every entity of a type, including embedded o
 const api = createHalc({
   adapter: hal,
   preprocessors: {
-    ScheduleEntry: (entry, ctx) => ({
-      startDate: dayjs(entry.start),
-      dayNumber: ctx.get(entry.$hrefSync('day'))?.number,
+    Chapter: (chapter, ctx) => ({
+      publishedAt: new Date(chapter.published),
+      bookTitle: ctx.get(chapter.$hrefSync('book'))?.title,
     }),
   },
 })
 
-api.get(entryUri).dayNumber
+api.get(chapterUri).bookTitle
 ```
 
 A preprocessor must be pure and must not send requests. It runs lazily and is memoized per version of
@@ -283,29 +283,26 @@ import type { Collection, Entity, InferPreprocessed, Templated } from 'halc'
 
 declare module 'halc' {
   interface ResourceMap {
-    Camp: Entity<
-      { title: string; motto: string | null },
+    Book: Entity<
+      { title: string; subtitle: string | null },
       {
-        activities: Collection<'Activity'> // to-many
-        creator: 'User' // to-one
-        campCollaborations: Templated<
-          Collection<'CampCollaboration'>,
-          { status?: string }
-        >
+        chapters: Collection<'Chapter'> // to-many
+        author: 'Author' // to-one
+        reviews: Templated<Collection<'Review'>, { rating?: number }>
       }
     >
-    Activity: Entity<{ title: string }, { camp: 'Camp' }>
+    Chapter: Entity<{ title: string }, { book: 'Book' }>
   }
   // Fields added by preprocessors:
   interface PreprocessedFields extends InferPreprocessed<typeof preprocessors> {}
 }
 
-const camp = api.get<'Camp'>('/camps/1') // or api.get('/camps/1').as<'Camp'>()
-camp.activities().items[0].camp().title // string
+const book = api.get<'Book'>('/books/1') // or api.get('/books/1').as<'Book'>()
+book.chapters().items[0].book().title // string
 ```
 
 Type names are the ones detected at runtime (`_meta.type`). Preprocessors of types in the map receive
-`BaseOf<'Camp'>` (the wrapper without derived fields). `halc/vue` types `this.api` in Options API
+`BaseOf<'Book'>` (the wrapper without derived fields). `halc/vue` types `this.api` in Options API
 components.
 
 ## Modules
@@ -329,13 +326,13 @@ The core never imports any of the other modules, so they can become packages of 
 resources become records of their own, links become relations, and every record gets a type from its
 self link: the last path segment that is not an id, singularised and PascalCased.
 
-| Self link                                        | Type                    |
-| ------------------------------------------------ | ----------------------- |
-| `/camps/4b2c6f1a9e3d`                            | `Camp`                  |
-| `/activities?camp=%2Fapi%2Fcamps%2F4b2c6f1a9e3d` | `Activity` (collection) |
-| `/content_node/column_layouts/9f8e7d6c5b4a`      | `ColumnLayout`          |
-| `/camps/4b2c6f1a9e3d/categories`                 | `Category` (collection) |
-| `/` (the API root)                               | `Root`                  |
+| Self link                                      | Type                    |
+| ---------------------------------------------- | ----------------------- |
+| `/books/4b2c6f1a9e3d`                          | `Book`                  |
+| `/chapters?book=%2Fapi%2Fbooks%2F4b2c6f1a9e3d` | `Chapter` (collection)  |
+| `/library/audio_books/9f8e7d6c5b4a`            | `AudioBook`             |
+| `/books/4b2c6f1a9e3d/categories`               | `Category` (collection) |
+| `/` (the API root)                             | `Root`                  |
 
 Ids are path segments of digits, UUIDs, ULIDs or hex of 8 or more characters. A string `@type` in the
 resource wins. For APIs that deviate from the convention:
@@ -345,7 +342,7 @@ import { createHalAdapter, defaultTypeRules } from 'halc/hal'
 
 const adapter = createHalAdapter({
   types: [
-    { match: /^\/invitations\/[^/]+\/find$/, type: 'Invitation' },
+    { match: /^\/users\/[^/]+\/settings$/, type: 'UserSettings' },
     ...defaultTypeRules,
   ],
   // or replace detection completely: typeOf: (selfLink, fragment) => ...
@@ -381,7 +378,7 @@ import { hal } from 'halc/hal'
 import { PlainObjectStore } from 'halc/plain'
 
 const api = createHalc({ adapter: hal, store: new PlainObjectStore(records) })
-api.get(campUri).periods().items // works like on the main thread
+api.get(bookUri).chapters().items // works like on the main thread
 ```
 
 Reading something that is not in the snapshot throws, and nothing is ever requested.
@@ -397,25 +394,25 @@ import { createMockApi, fixture } from 'halc/testing'
 import 'halc/testing/vitest' // registers toMatchRequests
 
 const api = createMockApi({ adapter: hal })
-const camp = fixture('Camp', {
-  title: 'Summer camp',
-  activities: [
-    fixture('Activity', { title: 'Hike' }),
-    fixture('Activity', { title: 'Campfire' }),
+const book = fixture('Book', {
+  title: 'The Hobbit',
+  chapters: [
+    fixture('Chapter', { title: 'An Unexpected Party' }),
+    fixture('Chapter', { title: 'Roast Mutton' }),
   ],
 })
-api.mock.get(camp) // the route is the fixture's self link: /api/camps/000000000003
-api.mock.get(camp.activities) // the activities collection of the camp
-api.mock.patch(camp).reply(200, (current) => ({ ...current, title: 'Renamed' }))
+api.mock.get(book) // the route is the fixture's self link: /api/books/000000000003
+api.mock.get(book.chapters) // the chapters collection of the book
+api.mock.patch(book).reply(200, (current) => ({ ...current, title: 'Renamed' }))
 
-const loaded = await api.get(camp._meta.self)._meta.load
-await loaded.activities()._meta.load
-expect(loaded.activities().items).toHaveLength(2)
+const loaded = await api.get(book._meta.self)._meta.load
+await loaded.chapters()._meta.load
+expect(loaded.chapters().items).toHaveLength(2)
 await loaded.$patch({ title: 'Renamed' })
 expect(api.mock.requests).toMatchRequests([
-  { method: 'GET', type: 'Camp' },
-  { method: 'GET', type: 'Activity' },
-  { method: 'PATCH', type: 'Camp', body: { title: 'Renamed' } },
+  { method: 'GET', type: 'Book' },
+  { method: 'GET', type: 'Chapter' },
+  { method: 'PATCH', type: 'Book', body: { title: 'Renamed' } },
 ])
 ```
 
@@ -471,7 +468,7 @@ Axios is no longer used: pass headers through `headers` or `interceptors`. PATCH
   entities deleted by a cascade end up in that state instead of being removed from the store.
 - POST reloads the target collection afterwards.
 - The Vuex module holds records (`{ uri, data, meta }`) instead of v3's store data, and embedded lists
-  are no longer stored under virtual keys (`api.get('/camps/1#periods')` still works).
+  are no longer stored under virtual keys (`api.get('/books/1#chapters')` still works).
 - The API root is always `''` (v3 sometimes stored it as `'/'`).
 
 ## Architecture
