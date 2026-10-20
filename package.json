@@ -49,6 +49,10 @@
       "types": "./dist/testing/vitest.d.ts",
       "default": "./dist/testing/vitest.js"
     },
+    "./plain": {
+      "types": "./dist/plain/index.d.ts",
+      "default": "./dist/plain/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

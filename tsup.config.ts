@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     index: 'src/index.ts',
     'hal/index': 'src/hal/index.ts',
+    'plain/index': 'src/plain/index.ts',
     'testing/index': 'src/testing/index.ts',
     'testing/vitest': 'src/testing/vitest.ts',
   },
