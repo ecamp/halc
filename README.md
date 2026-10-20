@@ -112,6 +112,7 @@ api.href(uriOrEntity, 'relation', params) // Promise of a relation's URI
 api.invalidate(uriOrEntity) // mark as outdated: the next read reloads it
 api.purge(uriOrEntity) // forget, without telling the API; api.purgeAll() forgets everything
 api.isUnknown(uri)
+api.resolveUrl(uri) // the URL of a normalized URI, e.g. to navigate to an href
 api.status(uri) // 'loading' | 'loaded' | 'stale' | 'error' | 'placeholder' | undefined
 ```
 
@@ -467,6 +468,8 @@ Axios is no longer used: pass headers through `headers` or `interceptors`. PATCH
 - After a failed GET, the resource is not requested again until it is reloaded (sticky errors), and
   entities deleted by a cascade end up in that state instead of being removed from the store.
 - POST reloads the target collection afterwards.
+- `$href` and `api.href` return normalized URIs for templated links too (v3 returned them with the
+  API path). Use `api.resolveUrl(href)` where a URL is needed, e.g. to redirect the browser.
 - The Vuex module holds records (`{ uri, data, meta }`) instead of v3's store data, and embedded lists
   are no longer stored under virtual keys (`api.get('/books/1#chapters')` still works).
 - The API root is always `''` (v3 sometimes stored it as `'/'`).

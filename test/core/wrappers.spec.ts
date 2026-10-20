@@ -50,6 +50,21 @@ describe('wrappers', () => {
     expect(loaded.as()).toBe(loaded)
   })
 
+  it('resolves normalized URIs to URLs, e.g. to navigate to an expanded templated link', async () => {
+    const api = createApi()
+    api.mock.get('/api/').reply(200, {
+      _links: {
+        self: { href: '/api/' },
+        oauth: { href: '/api/auth{?callback}', templated: true },
+      },
+    })
+    const href = await api.href('', 'oauth', { callback: 'https://app.example.com/back' })
+    expect(href).toBe('/auth?callback=https%3A%2F%2Fapp.example.com%2Fback')
+    expect(api.resolveUrl(href!)).toBe(
+      'http://localhost/api/auth?callback=https%3A%2F%2Fapp.example.com%2Fback'
+    )
+  })
+
   it('expose absolute URLs', async () => {
     const api = createApi()
     const camp = fixture('Camp')

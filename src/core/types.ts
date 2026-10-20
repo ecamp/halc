@@ -279,4 +279,9 @@ export interface Client {
   setReactivity(reactivity: ReactivityAdapter): void
   /** Normalizes a URI the same way the store keys are normalized. */
   normalizeUri(uri: string): string
+  /**
+   * Turns a normalized URI (e.g. from `$href` or `_meta.self`) back into a URL that can be
+   * requested or navigated to, by prepending the API base URL.
+   */
+  resolveUrl(uri: string): string
 }
