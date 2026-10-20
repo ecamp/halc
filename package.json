@@ -37,6 +37,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./hal": {
+      "types": "./dist/hal/index.d.ts",
+      "default": "./dist/hal/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

@@ -1,0 +1,635 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`HAL normalizer > normalizes the v3 fixture array-property 1`] = `
+[
+  {
+    "data": {
+      "arrayProperty": [
+        {
+          "a": 1,
+          "nested": [
+            {
+              "b": 2,
+            },
+          ],
+        },
+      ],
+      "emptyArray": [],
+      "id": 1,
+    },
+    "meta": {
+      "resource": "/camps/{id}",
+      "status": "loaded",
+      "type": "Camp",
+      "version": 0,
+    },
+    "uri": "/camps/1",
+  },
+]
+`;
+
+exports[`HAL normalizer > normalizes the v3 fixture circular-reference 1`] = `
+[
+  {
+    "data": {
+      "camp": {
+        "href": "http://localhost/camps/3",
+      },
+      "lastUsedDay": {
+        "href": "http://localhost/days/2",
+      },
+    },
+    "meta": {
+      "resource": "/periods/{id}",
+      "status": "loaded",
+      "type": "Period",
+      "version": 0,
+    },
+    "uri": "http://localhost/periods/1",
+  },
+  {
+    "data": {
+      "owner": {
+        "href": "http://localhost/periods/1",
+      },
+    },
+    "meta": {
+      "resource": "/days/{id}",
+      "status": "loaded",
+      "type": "Day",
+      "version": 0,
+    },
+    "uri": "http://localhost/days/2",
+  },
+]
+`;
+
+exports[`HAL normalizer > normalizes the v3 fixture collection-firstPage 1`] = `
+[
+  {
+    "data": {
+      "_page": 0,
+      "_per_page": 2,
+      "_total": 3,
+      "first": {
+        "href": "/camps/1/activities?page=0&page_size=2",
+      },
+      "items": {
+        "hrefs": [
+          "/activities/2394",
+          "/activities/2362",
+        ],
+      },
+      "next": {
+        "href": "/camps/1/activities?page=1&page_size=2",
+      },
+      "page_count": 2,
+    },
+    "meta": {
+      "resource": "/camps/{id}/activities",
+      "status": "loaded",
+      "type": "Activity",
+      "version": 0,
+    },
+    "uri": "/camps/1/activities",
+  },
+  {
+    "data": {
+      "id": 2394,
+      "title": "Volleyball",
+      "type": {
+        "href": "/activityTypes/8877",
+      },
+    },
+    "meta": {
+      "resource": "/activities/{id}",
+      "status": "loaded",
+      "type": "Activity",
+      "version": 0,
+    },
+    "uri": "/activities/2394",
+  },
+  {
+    "data": {
+      "color": "#00aa00",
+      "id": 8877,
+      "name": "LS",
+    },
+    "meta": {
+      "resource": "/activityTypes/{id}",
+      "status": "loaded",
+      "type": "ActivityType",
+      "version": 0,
+    },
+    "uri": "/activityTypes/8877",
+  },
+  {
+    "data": {
+      "id": 2362,
+      "title": "Geländespiel",
+      "type": {
+        "href": "/activityTypes/8879",
+      },
+    },
+    "meta": {
+      "resource": "/activities/{id}",
+      "status": "loaded",
+      "type": "Activity",
+      "version": 0,
+    },
+    "uri": "/activities/2362",
+  },
+  {
+    "data": {
+      "color": "#aaaa00",
+      "id": 8879,
+      "name": "LP",
+    },
+    "meta": {
+      "resource": "/activityTypes/{id}",
+      "status": "loaded",
+      "type": "ActivityType",
+      "version": 0,
+    },
+    "uri": "/activityTypes/8879",
+  },
+]
+`;
+
+exports[`HAL normalizer > normalizes the v3 fixture collection-page1 1`] = `
+[
+  {
+    "data": {
+      "_page": 1,
+      "_per_page": 2,
+      "_total": 3,
+      "first": {
+        "href": "/camps/1/activities?page=0&page_size=2",
+      },
+      "items": {
+        "hrefs": [
+          "/activities/2402",
+        ],
+      },
+      "page_count": 2,
+      "prev": {
+        "href": "/camps/1/activities?page=0&page_size=2",
+      },
+    },
+    "meta": {
+      "resource": "/camps/{id}/activities",
+      "status": "loaded",
+      "type": "Activity",
+      "version": 0,
+    },
+    "uri": "/camps/1/activities?page=1&page_size=2",
+  },
+  {
+    "data": {
+      "id": 2402,
+      "title": "TABS",
+      "type": {
+        "href": "/activityTypes/8879",
+      },
+    },
+    "meta": {
+      "resource": "/activities/{id}",
+      "status": "loaded",
+      "type": "Activity",
+      "version": 0,
+    },
+    "uri": "/activities/2402",
+  },
+  {
+    "data": {
+      "color": "#aaaa00",
+      "id": 8879,
+      "name": "LP",
+    },
+    "meta": {
+      "resource": "/activityTypes/{id}",
+      "status": "loaded",
+      "type": "ActivityType",
+      "version": 0,
+    },
+    "uri": "/activityTypes/8879",
+  },
+]
+`;
+
+exports[`HAL normalizer > normalizes the v3 fixture embedded-collection 1`] = `
+[
+  {
+    "data": {
+      "id": 1,
+      "periods": {
+        "hrefs": [
+          "/periods/104",
+          "/periods/128",
+        ],
+      },
+    },
+    "meta": {
+      "resource": "/camps/{id}",
+      "status": "loaded",
+      "type": "Camp",
+      "version": 0,
+    },
+    "uri": "/camps/1",
+  },
+  {
+    "data": {
+      "activities": {
+        "href": "/periods/104/activities",
+      },
+      "camp": {
+        "href": "/camps/1",
+      },
+      "end": "03-01-2019",
+      "id": 104,
+      "start": "01-01-2019",
+    },
+    "meta": {
+      "resource": "/periods/{id}",
+      "status": "loaded",
+      "type": "Period",
+      "version": 0,
+    },
+    "uri": "/periods/104",
+  },
+  {
+    "data": {
+      "activities": {
+        "href": "/periods/128/activities",
+      },
+      "camp": {
+        "href": "/camps/1",
+      },
+      "end": "19-04-2019",
+      "id": 128,
+      "start": "12-04-2019",
+    },
+    "meta": {
+      "resource": "/periods/{id}",
+      "status": "loaded",
+      "type": "Period",
+      "version": 0,
+    },
+    "uri": "/periods/128",
+  },
+]
+`;
+
+exports[`HAL normalizer > normalizes the v3 fixture embedded-collection-link-array 1`] = `
+[
+  {
+    "data": {
+      "id": 1,
+      "periods": {
+        "hrefs": [
+          "/periods/104",
+          "/periods/128",
+        ],
+      },
+    },
+    "meta": {
+      "resource": "/camps/{id}",
+      "status": "loaded",
+      "type": "Camp",
+      "version": 0,
+    },
+    "uri": "/camps/1",
+  },
+  {
+    "data": {
+      "activities": {
+        "href": "/periods/104/activities",
+      },
+      "camp": {
+        "href": "/camps/1",
+      },
+      "end": "03-01-2019",
+      "id": 104,
+      "start": "01-01-2019",
+    },
+    "meta": {
+      "resource": "/periods/{id}",
+      "status": "loaded",
+      "type": "Period",
+      "version": 0,
+    },
+    "uri": "/periods/104",
+  },
+  {
+    "data": {
+      "activities": {
+        "href": "/periods/128/activities",
+      },
+      "camp": {
+        "href": "/camps/1",
+      },
+      "end": "19-04-2019",
+      "id": 128,
+      "start": "12-04-2019",
+    },
+    "meta": {
+      "resource": "/periods/{id}",
+      "status": "loaded",
+      "type": "Period",
+      "version": 0,
+    },
+    "uri": "/periods/128",
+  },
+]
+`;
+
+exports[`HAL normalizer > normalizes the v3 fixture embedded-collection-standalone-link 1`] = `
+[
+  {
+    "data": {
+      "id": 1,
+      "periods": {
+        "href": "/camps/1/periods",
+      },
+    },
+    "meta": {
+      "resource": "/camps/{id}",
+      "status": "loaded",
+      "type": "Camp",
+      "version": 0,
+    },
+    "uri": "/camps/1",
+  },
+  {
+    "data": {
+      "activities": {
+        "href": "/periods/104/activities",
+      },
+      "camp": {
+        "href": "/camps/1",
+      },
+      "end": "03-01-2019",
+      "id": 104,
+      "start": "01-01-2019",
+    },
+    "meta": {
+      "resource": "/periods/{id}",
+      "status": "loaded",
+      "type": "Period",
+      "version": 0,
+    },
+    "uri": "/periods/104",
+  },
+  {
+    "data": {
+      "activities": {
+        "href": "/periods/128/activities",
+      },
+      "camp": {
+        "href": "/camps/1",
+      },
+      "end": "19-04-2019",
+      "id": 128,
+      "start": "12-04-2019",
+    },
+    "meta": {
+      "resource": "/periods/{id}",
+      "status": "loaded",
+      "type": "Period",
+      "version": 0,
+    },
+    "uri": "/periods/128",
+  },
+  {
+    "data": {
+      "items": {
+        "hrefs": [
+          "/periods/104",
+          "/periods/128",
+        ],
+      },
+    },
+    "meta": {
+      "resource": "/camps/{id}/periods",
+      "status": "loaded",
+      "type": "Period",
+      "version": 0,
+    },
+    "uri": "/camps/1/periods",
+  },
+]
+`;
+
+exports[`HAL normalizer > normalizes the v3 fixture embedded-single-entity 1`] = `
+[
+  {
+    "data": {
+      "campType": {
+        "href": "/campTypes/20",
+      },
+      "id": 1,
+    },
+    "meta": {
+      "resource": "/camps/{id}",
+      "status": "loaded",
+      "type": "Camp",
+      "version": 0,
+    },
+    "uri": "/camps/1",
+  },
+  {
+    "data": {
+      "id": 20,
+      "js": true,
+      "name": "camp",
+      "targetGroup": "Kids",
+    },
+    "meta": {
+      "resource": "/campTypes/{id}",
+      "status": "loaded",
+      "type": "CampType",
+      "version": 0,
+    },
+    "uri": "/campTypes/20",
+  },
+]
+`;
+
+exports[`HAL normalizer > normalizes the v3 fixture linked-collection 1`] = `
+[
+  {
+    "data": {
+      "activities": {
+        "href": "/camps/1/activities",
+      },
+      "id": 1,
+    },
+    "meta": {
+      "resource": "/camps/{id}",
+      "status": "loaded",
+      "type": "Camp",
+      "version": 0,
+    },
+    "uri": "/camps/1",
+  },
+]
+`;
+
+exports[`HAL normalizer > normalizes the v3 fixture linked-entity-array 1`] = `
+[
+  {
+    "data": {
+      "activities": {
+        "hrefs": [
+          "/activities/1",
+          "/activities/2",
+        ],
+      },
+      "id": 1,
+    },
+    "meta": {
+      "resource": "/camps/{id}",
+      "status": "loaded",
+      "type": "Camp",
+      "version": 0,
+    },
+    "uri": "/camps/1",
+  },
+]
+`;
+
+exports[`HAL normalizer > normalizes the v3 fixture linked-single-entity 1`] = `
+[
+  {
+    "data": {
+      "id": 1,
+      "main_leader": {
+        "href": "/users/83",
+      },
+    },
+    "meta": {
+      "resource": "/camps/{id}",
+      "status": "loaded",
+      "type": "Camp",
+      "version": 0,
+    },
+    "uri": "/camps/1",
+  },
+]
+`;
+
+exports[`HAL normalizer > normalizes the v3 fixture multiple-references-to-user 1`] = `
+[
+  {
+    "data": {
+      "id": 99,
+      "name": "Pfadi Züri",
+      "users": {
+        "hrefs": [
+          "/users/1",
+        ],
+      },
+    },
+    "meta": {
+      "resource": "/groups/{id}",
+      "status": "loaded",
+      "type": "Group",
+      "version": 0,
+    },
+    "uri": "/groups/99",
+  },
+  {
+    "data": {
+      "id": 1,
+      "lastViewedCamp": {
+        "href": "/camps/123",
+      },
+      "name": "Linux",
+    },
+    "meta": {
+      "resource": "/users/{id}",
+      "status": "loaded",
+      "type": "User",
+      "version": 0,
+    },
+    "uri": "/users/1",
+  },
+  {
+    "data": {
+      "id": 123,
+      "owner": {
+        "href": "/users/1",
+      },
+    },
+    "meta": {
+      "resource": "/camps/{id}",
+      "status": "loaded",
+      "type": "Camp",
+      "version": 0,
+    },
+    "uri": "/camps/123",
+  },
+]
+`;
+
+exports[`HAL normalizer > normalizes the v3 fixture object-property 1`] = `
+[
+  {
+    "data": {
+      "emptyObject": {},
+      "id": 1,
+      "objectProperty": {
+        "a": 1,
+        "nested": {
+          "b": 2,
+        },
+      },
+    },
+    "meta": {
+      "resource": "/camps/{id}",
+      "status": "loaded",
+      "type": "Camp",
+      "version": 0,
+    },
+    "uri": "/camps/1",
+  },
+]
+`;
+
+exports[`HAL normalizer > normalizes the v3 fixture reference-to-single-entity 1`] = `
+[
+  {
+    "data": {
+      "campType": {
+        "href": "/campTypes/20",
+      },
+      "id": 1,
+    },
+    "meta": {
+      "resource": "/camps/{id}",
+      "status": "loaded",
+      "type": "Camp",
+      "version": 0,
+    },
+    "uri": "/camps/1",
+  },
+]
+`;
+
+exports[`HAL normalizer > normalizes the v3 fixture root 1`] = `
+[
+  {
+    "data": {
+      "the": "root",
+      "this": "is",
+    },
+    "meta": {
+      "resource": "/",
+      "status": "loaded",
+      "type": "Root",
+      "version": 0,
+    },
+    "uri": "",
+  },
+]
+`;
