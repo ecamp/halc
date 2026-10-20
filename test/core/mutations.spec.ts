@@ -1,0 +1,183 @@
+import { describe, expect, it } from 'vitest'
+import { bodyForPost, diffForPatch, MutationQueue } from '../../src/core/mutations.js'
+import type { EntityRecord } from '../../src/core/records.js'
+import { createUriNormalizer } from '../../src/core/uri.js'
+import { deepEqual, deepFreeze } from '../../src/core/util.js'
+
+const context = {
+  normalizeUri: createUriNormalizer('http://localhost/api'),
+  iriOf: (self: string) => `/api${self}`,
+}
+
+const wrapper = (self: string) => ({ _meta: { self }, $patch: () => undefined })
+
+describe('diffForPatch', () => {
+  const current = {
+    title: 'x',
+    tags: ['a'],
+    data: { nested: { deep: 1 } },
+    creator: { href: '/users/1' },
+    periods: { hrefs: ['/periods/1'] },
+    parent: null,
+  }
+
+  it('keeps only top-level fields that differ', () => {
+    expect(
+      diffForPatch(
+        current,
+        { title: 'x', tags: ['a'], data: { nested: { deep: 2 } } },
+        context
+      )
+    ).toEqual({
+      body: { data: { nested: { deep: 2 } } },
+      dirty: { data: { nested: { deep: 2 } } },
+    })
+  })
+
+  it('ignores functions, _meta and undefined, so spread wrappers can be passed', () => {
+    const data = {
+      ...current,
+      _meta: { self: '/camps/1' },
+      creator: () => undefined,
+      missing: undefined,
+    }
+    expect(diffForPatch(current, data, context).body).toEqual({})
+  })
+
+  it('compares relations by normalized URI and sends IRIs', () => {
+    expect(
+      diffForPatch(
+        current,
+        { creator: '/api/users/1', periods: ['/api/periods/1'] },
+        context
+      ).body
+    ).toEqual({})
+    expect(diffForPatch(current, { creator: wrapper('/users/1') }, context).body).toEqual(
+      {}
+    )
+    expect(diffForPatch(current, { creator: wrapper('/users/2') }, context)).toEqual({
+      body: { creator: '/api/users/2' },
+      dirty: { creator: { href: '/users/2' } },
+    })
+    expect(
+      diffForPatch(current, { periods: ['/api/periods/2'], creator: null }, context)
+    ).toEqual({
+      body: { periods: ['/api/periods/2'], creator: null },
+      dirty: { periods: { hrefs: ['/periods/2'] }, creator: null },
+    })
+  })
+
+  it('compares values the way they will be sent', () => {
+    const date = new Date('2026-01-01T00:00:00Z')
+    expect(
+      diffForPatch({ start: '2026-01-01T00:00:00.000Z' }, { start: date }, context).body
+    ).toEqual({})
+  })
+
+  it('sends everything with force', () => {
+    expect(diffForPatch(current, { title: 'x' }, context, true).body).toEqual({
+      title: 'x',
+    })
+  })
+})
+
+describe('bodyForPost', () => {
+  it('turns wrappers into IRIs and drops functions and _meta', () => {
+    expect(
+      bodyForPost(
+        { camp: wrapper('/camps/1'), title: 't', fn: () => 1, _meta: {} },
+        context
+      )
+    ).toEqual({
+      camp: '/api/camps/1',
+      title: 't',
+    })
+  })
+})
+
+describe('MutationQueue', () => {
+  const record: EntityRecord = {
+    uri: '/activities',
+    data: { title: 'x', items: { hrefs: ['/activities/1'] } },
+    meta: { version: 1, status: 'loaded' },
+  }
+
+  it('merges pending optimistic changes and temporary items', () => {
+    const queue = new MutationQueue()
+    queue.add({
+      id: '1',
+      kind: 'patch',
+      uri: '/activities',
+      optimistic: true,
+      dirty: { title: 'y' },
+    })
+    queue.add({
+      id: '2',
+      kind: 'post',
+      uri: '/activities',
+      optimistic: true,
+      tempUri: 'urn:tmp:2',
+    })
+    queue.add({
+      id: '3',
+      kind: 'patch',
+      uri: '/activities',
+      optimistic: false,
+      dirty: { title: 'z' },
+    })
+    queue.add({
+      id: '4',
+      kind: 'patch',
+      uri: '/other',
+      optimistic: true,
+      dirty: { title: 'o' },
+    })
+
+    expect(queue.dirtyFor(record)).toEqual({
+      title: 'y',
+      items: { hrefs: ['/activities/1', 'urn:tmp:2'] },
+    })
+    queue.remove(queue.pending[0])
+    queue.remove(queue.pending[0])
+    expect(queue.dirtyFor(record)).toBeUndefined()
+    expect(queue.nextId()).not.toBe(queue.nextId())
+  })
+
+  it('runs tasks of the same URI one after another, others in parallel', async () => {
+    const queue = new MutationQueue()
+    const log: string[] = []
+    const task = (name: string, ms: number) => () =>
+      new Promise<string>((resolve) =>
+        setTimeout(() => {
+          log.push(name)
+          resolve(name)
+        }, ms)
+      )
+
+    const failing = queue.run('/a', () => Promise.reject(new Error('first fails')))
+    const results = Promise.all([
+      queue.run('/a', task('a1', 10)),
+      queue.run('/a', task('a2', 1)),
+      queue.run('/b', task('b1', 5)),
+    ])
+    await expect(failing).rejects.toThrow('first fails')
+    await expect(results).resolves.toEqual(['a1', 'a2', 'b1'])
+    expect(log).toEqual(['b1', 'a1', 'a2'])
+    await queue.settled('/a')
+  })
+})
+
+describe('util', () => {
+  it('compares JSON values structurally', () => {
+    expect(deepEqual({ a: [1, { b: 2 }] }, { a: [1, { b: 2 }] })).toBe(true)
+    expect(deepEqual({ a: 1 }, { a: 1, b: undefined })).toBe(false)
+    expect(deepEqual([1], { 0: 1 })).toBe(false)
+    expect(deepEqual(null, {})).toBe(false)
+    expect(deepEqual(NaN, NaN)).toBe(true)
+  })
+
+  it('freezes recursively', () => {
+    const value = deepFreeze({ a: { b: [1] } })
+    expect(Object.isFrozen(value.a.b)).toBe(true)
+  })
+})
