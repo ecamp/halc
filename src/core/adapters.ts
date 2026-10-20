@@ -67,7 +67,8 @@ export interface ApiAdapter {
   readonly contentTypes?: readonly string[]
   /**
    * Turns a response body into records: the requested resource first, followed by every
-   * embedded resource, each with its detected `meta.type`.
+   * embedded resource, each with its detected `meta.type`. The returned records must be new
+   * objects; the client takes ownership and completes their meta in place.
    */
   normalize(
     uri: string,

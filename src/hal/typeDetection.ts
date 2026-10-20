@@ -16,7 +16,7 @@ const HEX = /^[0-9a-f]{8,}$/i
 /** An id segment is all digits, a UUID, a ULID, or hex with 8 or more characters. */
 export function isIdSegment(segment: string): boolean {
   return (
-    /^\d+$/.test(segment) || UUID.test(segment) || ULID.test(segment) || HEX.test(segment)
+    HEX.test(segment) || /^\d+$/.test(segment) || UUID.test(segment) || ULID.test(segment)
   )
 }
 
@@ -65,14 +65,25 @@ export interface PathRuleOptions {
  */
 export function pathTypeRule(options: PathRuleOptions = {}): TypeRule {
   const toSingular = options.singularize ?? singularize
+  // A response holds many records with few distinct resource names.
+  const typeOfName = new Map<string, string>()
   return (path: string) => {
     const segments = path.split('/').filter(Boolean)
     if (segments.length === 0) return 'Root'
-    const name = segments.filter((segment) => !isIdSegment(segment)).pop()
+    let name: string | undefined
+    for (let index = segments.length - 1; index >= 0 && name === undefined; index--) {
+      const segment = segments[index] as string
+      if (!isIdSegment(segment)) name = segment
+    }
     if (name === undefined) return undefined
-    const words = name.split(/(?=[A-Z])|[_-]/).filter(Boolean)
-    const last = words.pop() ?? ''
-    return pascalCase([...words, toSingular(last)].join('_'))
+    let type = typeOfName.get(name)
+    if (type === undefined) {
+      const words = name.split(/(?=[A-Z])|[_-]/).filter(Boolean)
+      const last = words.pop() ?? ''
+      type = pascalCase([...words, toSingular(last)].join('_'))
+      typeOfName.set(name, type)
+    }
+    return type
   }
 }
 

@@ -820,7 +820,7 @@ export class HalcClient implements Client {
         })
       } else if (top.uri !== uri) {
         if (this.options.forceRequestedSelfLink) records[0] = { ...top, uri }
-        else records.push({ ...top, uri })
+        else records.push({ ...top, uri, meta: { ...top.meta } })
       }
       this.writeRecords(records)
     } catch (error) {
@@ -1022,29 +1022,27 @@ export class HalcClient implements Client {
 
   /** Writes response records in one batch and notifies once per record. */
   private writeRecords(records: EntityRecord[]): void {
+    // The records are fresh from the adapter and owned by this call, so they are completed in
+    // place: a large response is thousands of records, and copying them doubles the garbage.
     const now = Date.now()
-    const written = records.map((record) => {
+    const uris: string[] = []
+    for (const record of records) {
       const existing = this.store.get(record.uri)
-      const type = record.meta.type ?? existing?.meta.type
-      const meta: EntityMeta = {
-        version: (existing?.meta.version ?? 0) + 1,
-        status: 'loaded',
-        loadedAt: now,
+      const meta = record.meta
+      meta.version = (existing?.meta.version ?? 0) + 1
+      meta.status = 'loaded'
+      meta.loadedAt = now
+      if (meta.type === undefined && existing?.meta.type !== undefined) {
+        meta.type = existing.meta.type
       }
-      if (type !== undefined) meta.type = type
-      if (record.meta.resource !== undefined) meta.resource = record.meta.resource
       if (existing?.meta.deleting) meta.deleting = true
-      const written: EntityRecord = {
-        uri: record.uri,
-        data: deepFreeze(record.data),
-        meta,
-      }
-      const dirty = this.queue.dirtyFor(written)
+      deepFreeze(record.data)
+      const dirty = this.queue.dirtyFor(record)
       if (dirty) meta.dirty = dirty
-      return written
-    })
-    this.store.set(written)
-    this.afterWrite(written.map((record) => record.uri))
+      uris.push(record.uri)
+    }
+    this.store.set(records)
+    this.afterWrite(uris)
   }
 
   private patchMeta(uri: string, patch: MetaPatch): void {
