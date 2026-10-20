@@ -7,6 +7,7 @@ export default defineConfig({
     'plain/index': 'src/plain/index.ts',
     'vue/index': 'src/vue/index.ts',
     'pinia/index': 'src/pinia/index.ts',
+    'vuex/index': 'src/vuex/index.ts',
     'testing/index': 'src/testing/index.ts',
     'testing/vitest': 'src/testing/vitest.ts',
   },

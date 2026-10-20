@@ -61,6 +61,10 @@
       "types": "./dist/pinia/index.d.ts",
       "default": "./dist/pinia/index.js"
     },
+    "./vuex": {
+      "types": "./dist/vuex/index.d.ts",
+      "default": "./dist/vuex/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
