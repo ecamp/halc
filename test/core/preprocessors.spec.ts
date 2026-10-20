@@ -98,3 +98,22 @@ describe('preprocessors', () => {
     expect(preprocessor).not.toHaveBeenCalled()
   })
 })
+
+describe('preprocessors and collections', () => {
+  it('do not run for the collections of their type', async () => {
+    const preprocessor = vi.fn((activity: any) => ({
+      shout: String(activity.title).toUpperCase(),
+    }))
+    const api = createApi({ preprocessors: { Activity: preprocessor } })
+    const activities = collectionFixture('Activity', [
+      fixture('Activity', { title: 'hike' }),
+    ])
+    api.mock.get(activities)
+
+    const collection = await api.get(activities._meta.self)._meta.load
+
+    expect(collection.items[0].shout).toBe('HIKE')
+    expect(collection.shout).toBeUndefined()
+    expect(preprocessor).toHaveBeenCalledTimes(1)
+  })
+})

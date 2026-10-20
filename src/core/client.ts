@@ -487,7 +487,8 @@ export class HalcClient implements Client {
     const uri = wrapper._meta.self
     this.reactivity.track(uri)
     const record = this.store.get(uri)
-    if (!record || !isLoaded(record)) return undefined
+    // Collections carry the type of their items, but preprocessors are written for the items.
+    if (!record || !isLoaded(record) || isCollectionRecord(record)) return undefined
     const type = record.meta.type ?? ''
     const preprocessor = this.preprocessorFor(type)
     if (!preprocessor) return undefined

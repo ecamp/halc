@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method -- methods are only inspected, not called */
 /**
  * Compile-time checks of the optional ResourceMap typing. Not run, only type checked by
  * `npm run typecheck`.
@@ -50,9 +49,10 @@ expectTypeOf(camp.collaborations)
   .parameter(0)
   .toEqualTypeOf<{ status?: string } | undefined>()
 expectTypeOf(camp.collaborations().items[0].name).toEqualTypeOf<string>()
-expectTypeOf(camp.$patch)
-  .parameter(0)
-  .toEqualTypeOf<Partial<{ title: string; motto: string | null }>>()
+type PatchData = Parameters<typeof camp.$patch>[0]
+expectTypeOf<PatchData['title']>().toEqualTypeOf<string | undefined>()
+expectTypeOf<PatchData['motto']>().toEqualTypeOf<string | null | undefined>()
+expectTypeOf<{ creator: '/users/1' }>().toExtend<PatchData>()
 expectTypeOf(api.get<'TypedUser'>('/users/1')._meta.load).resolves.toHaveProperty('name')
 
 expectTypeOf(camp).not.toHaveProperty('unknownRelation')
@@ -76,3 +76,15 @@ createHalc({
     Other: (other) => ({ upper: String(other.title) }),
   },
 })
+
+// Derived fields survive _meta.load, $reload() and $patch(); relations can be patched with URIs.
+export async function derivedFieldsAfterLoading() {
+  const loaded = await api.get<'TypedCamp'>('/camps/1')._meta.load
+  expectTypeOf(loaded.isLong).toEqualTypeOf<boolean>()
+  expectTypeOf((await loaded.$reload()).isLong).toEqualTypeOf<boolean>()
+  expectTypeOf(
+    (await loaded.$patch({ title: 'x', creator: '/users/1' })).isLong
+  ).toEqualTypeOf<boolean>()
+  // @ts-expect-error -- not a property or relation of TypedCamp
+  await loaded.$patch({ unknown: 1 })
+}

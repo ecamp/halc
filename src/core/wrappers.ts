@@ -3,6 +3,7 @@ import { ApiError } from './errors.js'
 import {
   currentData,
   currentValue,
+  isCollectionRecord,
   isCollectionRef,
   isLoaded,
   isRelationRef,
@@ -258,7 +259,11 @@ export class WrapperFactory {
     const wrapper = new Wrapper({ client: this.client, uri })
     const keys = Object.keys(currentData(record)).filter((key) => !RESERVED_KEYS.has(key))
     Object.defineProperties(wrapper, this.descriptorsFor(keys))
-    if (this.client.hasPreprocessor(type) && !this.derivedKeys.has(type)) {
+    if (
+      this.client.hasPreprocessor(type) &&
+      !this.derivedKeys.has(type) &&
+      !isCollectionRecord(record)
+    ) {
       // Run once to learn which derived fields this type has.
       this.client.derived(wrapper as unknown as Resource, undefined)
     }
@@ -514,7 +519,7 @@ class PlaceholderMeta implements ResourceMeta {
 
   get selfUrl(): string {
     const { uri, client } = this.source
-    return (uri === undefined ? null : client.resolveUrl(uri)) as string
+    return (uri === undefined ? undefined : client.resolveUrl(uri)) as string
   }
 
   get load(): Promise<Resource> {

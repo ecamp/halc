@@ -24,7 +24,9 @@ export interface VuexStoreLike {
     module: {
       namespaced: boolean
       state: () => State
-      mutations: Record<string, (state: State, payload: never) => void>
+      // `any`, so a typed Vuex store (whose mutations take `payload?: any`) is accepted.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mutations: Record<string, (state: State, payload: any) => void>
     }
   ): void
   commit(type: string, payload?: unknown): void

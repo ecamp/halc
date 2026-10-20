@@ -41,10 +41,24 @@ export interface PreprocessedFields {}
 /** All type names known from {@link ResourceMap}. */
 export type TypeName = Extract<keyof ResourceMap, string>
 
-type DerivedOf<K> = K extends keyof PreprocessedFields ? PreprocessedFields[K] : unknown
+/** A wrapper type with derived fields, also in what `_meta.load`, `$reload()` etc. resolve to. */
+type WithDerived<W, D> = Omit<W, '_meta' | '$reload' | '$loadItems' | '$patch'> &
+  D & {
+    readonly _meta: ResourceMeta<WithDerived<W, D>>
+    $reload(): Promise<WithDerived<W, D>>
+    $loadItems(): Promise<WithDerived<W, D>>
+    $patch(
+      data: W extends { $patch(data: infer Data): unknown } ? Data : never,
+      options?: PatchOptions
+    ): Promise<WithDerived<W, D>>
+  }
 
 /** The wrapper type for a type name, including fields from preprocessors. */
-export type Of<K> = K extends TypeName ? ResourceMap[K] & DerivedOf<K> : Resource
+export type Of<K> = K extends TypeName
+  ? K extends keyof PreprocessedFields
+    ? WithDerived<ResourceMap[K], PreprocessedFields[K]>
+    : ResourceMap[K]
+  : Resource
 
 /** The wrapper type for a type name, without fields from preprocessors. */
 export type BaseOf<K> = K extends TypeName ? ResourceMap[K] : Resource
@@ -59,9 +73,13 @@ export type TemplateParams = Record<
 export type UriOrEntity = string | { readonly _meta: { readonly self: string | null } }
 
 export interface ResourceMeta<Self = Resource> {
-  /** Normalized URI of the resource (the API base URL removed). */
+  /**
+   * Normalized URI of the resource (the API base URL removed). Undefined only for placeholders of
+   * relations of unloaded resources, whose URI is not known yet (typed as string for convenience).
+   */
   readonly self: string
   /** Absolute URL of the resource. */
+  /** Absolute URL of the resource; undefined whenever `self` is. */
   readonly selfUrl: string
   /**
    * Resolves to the loaded wrapper, rejects with an {@link ApiError} if loading fails. While a
@@ -158,7 +176,12 @@ type RelationFunctions<R> = {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export type Entity<P, R = {}> = Readonly<P> &
   RelationFunctions<R> &
-  ResourceApi<Entity<P, R>, P>
+  ResourceApi<Entity<P, R>, P & RelationValues<R>>
+
+/** What can be patched into relations: URIs or wrappers (lists of them for to-many). */
+type RelationValues<R> = {
+  [K in keyof R]: string | UriOrEntity | null | readonly (string | UriOrEntity)[]
+}
 
 /** Wrapper type of a collection of the given type. */
 export type Collection<T = Resource> = ResourceApi<Collection<T>> &

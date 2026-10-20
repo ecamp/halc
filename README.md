@@ -251,37 +251,48 @@ try {
 
 ## Preprocessors
 
-Preprocessors add derived fields to every entity of a type, including embedded ones:
+Preprocessors add derived fields to every entity of a type, including embedded ones (but not to
+collections, although a collection of chapters also has the type `Chapter`):
 
 ```js
-const api = createHalc({
-  adapter: hal,
-  preprocessors: {
-    Chapter: (chapter, ctx) => ({
-      publishedAt: new Date(chapter.published),
-      bookTitle: ctx.get(chapter.$hrefSync('book'))?.title,
-    }),
-  },
-})
+const preprocessors = {
+  Chapter: (chapter, ctx) => ({
+    publishedAt: new Date(chapter.published),
+    bookTitle: ctx.get(chapter.$hrefSync('book'))?.title,
+  }),
+}
+const api = createHalc({ adapter: hal, preprocessors })
 
 api.get(chapterUri).bookTitle
 ```
 
-A preprocessor must be pure and must not send requests. It runs lazily and is memoized per version of
-the entity; other resources read through `ctx.get()` (which never loads anything) are tracked, so the
-derived fields are recomputed when they change. Derived fields are not enumerable, so they never end
+A preprocessor must be pure and must not send requests. It runs when a derived field of an entity is
+read (and once when the first entity of its type is read, to learn the field names), and its result is
+memoized per version of the entity; other resources read through `ctx.get()` (which never loads
+anything) are tracked, so the derived fields are recomputed when they change. Derived fields are not enumerable, so they never end
 up in `$patch({ ...entity })`, and they never shadow properties of the entity: use distinct names.
 
 ## TypeScript
 
 halc works untyped: without further setup, every wrapper is a generic `Resource`, so the halc API
-(`_meta`, `$patch`, `items`, …) is typed and completes, while entity properties are `any`.
-JavaScript projects get the same completion in editors.
+of the wrappers you get from the client (`_meta`, `$patch`, `items`, …) is typed and completes,
+while entity properties and the results of relation functions are `any` (call `.as<'Type'>()` or
+describe the types to go further). JavaScript projects get the same completion in editors.
 
 For typed entities, describe them in the `ResourceMap`:
 
 ```ts
-import type { Collection, Entity, InferPreprocessed, Templated } from 'halc'
+import type {
+  Collection,
+  Entity,
+  InferPreprocessed,
+  Preprocessors,
+  Templated,
+} from 'halc'
+
+export const preprocessors = {
+  Chapter: (chapter) => ({ publishedAt: new Date(chapter.published) }), // chapter is typed
+} satisfies Preprocessors
 
 declare module 'halc' {
   interface ResourceMap {
@@ -293,7 +304,7 @@ declare module 'halc' {
         reviews: Templated<Collection<'Review'>, { rating?: number }>
       }
     >
-    Chapter: Entity<{ title: string }, { book: 'Book' }>
+    Chapter: Entity<{ title: string; published: string }, { book: 'Book' }>
   }
   // Fields added by preprocessors:
   interface PreprocessedFields extends InferPreprocessed<typeof preprocessors> {}
@@ -301,6 +312,8 @@ declare module 'halc' {
 
 const book = api.get<'Book'>('/books/1') // or api.get('/books/1').as<'Book'>()
 book.chapters().items[0].book().title // string
+book.chapters().items[0].publishedAt // Date
+await book.$patch({ author: '/authors/2' }) // relations take URIs or wrappers
 ```
 
 Type names are the ones detected at runtime (`_meta.type`). Preprocessors of types in the map receive
