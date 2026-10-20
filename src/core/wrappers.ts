@@ -375,8 +375,8 @@ function rejectVirtual(operation: string): Promise<never> {
 }
 
 /**
- * An embedded or linked list of resources without a URI of its own, e.g. `camp.periods()` when
- * the API embeds the periods into the camp. Its items live in the owner's record, so reloading
+ * An embedded or linked list of resources without a URI of its own, e.g. `book.chapters()` when
+ * the API embeds the chapters into the book. Its items live in the owner's record, so reloading
  * it reloads the owner.
  */
 class VirtualCollectionWrapper {
@@ -557,7 +557,7 @@ const DELEGATED_METHODS = new Set([
 /**
  * Creates a stand-in for a resource that is not loaded yet. It renders as an empty string, its
  * `items` are empty, and any unknown property is a relation function returning another
- * placeholder, so `api.get(uri).camp().periods().items` works before anything is loaded. Once
+ * placeholder, so `api.get(uri).author().books().items` works before anything is loaded. Once
  * the resource is available, every read is forwarded to the real wrapper.
  */
 function createPlaceholder(source: PlaceholderSource): Resource {

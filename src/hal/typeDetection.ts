@@ -1,7 +1,7 @@
 /**
  * Zero-config type detection: in a HAL API, the self links are the type system.
- * `/camps/4b2c6f1a9e3d` is a `Camp`, `/content_node/column_layouts/9f8e7d6c5b4a` a `ColumnLayout`,
- * `/camps/4b2c6f1a9e3d/categories` a collection of `Category`.
+ * `/books/4b2c6f1a9e3d` is a `Book`, `/library/audio_books/9f8e7d6c5b4a` an `AudioBook`,
+ * `/books/4b2c6f1a9e3d/categories` a collection of `Category`.
  */
 
 /** A rule maps a path (relative to the API root, without query string) to a type name. */
@@ -21,8 +21,8 @@ export function isIdSegment(segment: string): boolean {
 }
 
 /**
- * Turns a plural resource name into a singular one: `activities` → `activity`,
- * `boxes` → `box`, `statuses` → `status`, `responses` → `response`, `camps` → `camp`.
+ * Turns a plural resource name into a singular one: `categories` → `category`,
+ * `boxes` → `box`, `statuses` → `status`, `responses` → `response`, `books` → `book`.
  */
 export function singularize(word: string): string {
   if (/ies$/i.test(word)) return word.slice(0, -3) + 'y'

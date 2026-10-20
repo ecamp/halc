@@ -14,7 +14,7 @@ export type RecordStatus = 'placeholder' | 'loading' | 'loaded' | 'stale' | 'err
 export interface EntityMeta {
   /** Bumped on every write; used as cache key for wrappers. */
   version: number
-  /** Entity type detected by the API adapter, e.g. `'Camp'`. */
+  /** Entity type detected by the API adapter, e.g. `'Book'`. */
   type?: string
   /** Internal: parameterised path for devtools and error messages, never used as a key. */
   resource?: string

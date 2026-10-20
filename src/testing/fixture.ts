@@ -2,12 +2,12 @@
  * Builds HAL documents from type names and plain objects, so tests contain no URIs.
  *
  * ```ts
- * const camp = fixture('Camp', {
- *   title: 'Summer camp',
- *   activities: [fixture('Activity', { title: 'Hike' })],
+ * const book = fixture('Book', {
+ *   title: 'The Hobbit',
+ *   chapters: [fixture('Chapter', { title: 'An Unexpected Party' })],
  * })
- * camp._meta.self    // '/api/camps/000000000001'
- * camp.activities    // the fixture of the activities collection, for mocking it
+ * book._meta.self    // '/api/books/000000000002'
+ * book.chapters      // the fixture of the chapters collection, for mocking it
  * ```
  */
 
@@ -45,7 +45,7 @@ export function resetFixtureIds(): void {
   counter = 0
 }
 
-/** A 12 character hex id, like the ones eCamp uses. */
+/** A 12 character hex id, which type detection recognizes as id. */
 export function nextFixtureId(): string {
   counter += 1
   return counter.toString(16).padStart(12, '0')
@@ -62,7 +62,7 @@ function snakeCase(name: string): string {
     .toLowerCase()
 }
 
-/** `Activity` → `activities`, `ScheduleEntry` → `schedule_entries`, `Box` → `boxes`. */
+/** `Chapter` → `chapters`, `AudioBook` → `audio_books`, `Category` → `categories`, `Box` → `boxes`. */
 export function pluralPath(type: string): string {
   const name = snakeCase(type)
   if (/[^aeiou]y$/.test(name)) return name.slice(0, -1) + 'ies'

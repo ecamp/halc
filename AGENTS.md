@@ -68,6 +68,8 @@ yet. Don't call `npx tsc` (that is TS 6); use the scripts.
   deliberate and explained in the test. Always ask before removing assertions.
 - Type-level tests live in `*.test-d.ts` (only typechecked). Benchmarks in `bench/*.bench.ts`
   assert the performance budget and import the built package by its name (`halc`).
+- Docs, JSDoc and examples use generic entities (books, chapters, authors, like hal-json-vuex did),
+  not eCamp's camps and activities.
 - `test/smoke.spec.ts` is the README testing example; keep both in sync. User-facing changes go
   into `CHANGELOG.md` and, if they affect usage, the README.
 - Commits are small and explain the why in the message.

@@ -44,8 +44,8 @@ export type UriNormalizer = (uri: string) => string
  * the API base URL (origin and path prefix) is removed, query parameters are sorted, and the
  * API root is always the empty string.
  *
- * With `baseUrl = 'https://example.com/api'`, the URIs `https://example.com/api/camps/1?b=1&a=2`
- * and `/api/camps/1?a=2&b=1` both normalize to `/camps/1?a=2&b=1`, and `/api/` to `''`.
+ * With `baseUrl = 'https://example.com/api'`, the URIs `https://example.com/api/books/1?b=1&a=2`
+ * and `/api/books/1?a=2&b=1` both normalize to `/books/1?a=2&b=1`, and `/api/` to `''`.
  * URIs on other origins are only sorted.
  */
 export function createUriNormalizer(baseUrl: string | null | undefined): UriNormalizer {

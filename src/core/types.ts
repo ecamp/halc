@@ -17,7 +17,7 @@ import type { RetryOptions } from './retry.js'
  * ```ts
  * declare module 'halc' {
  *   interface ResourceMap {
- *     Camp: Entity<{ title: string }, { activities: Collection<'Activity'>; creator: 'User' }>
+ *     Book: Entity<{ title: string }, { chapters: Collection<'Chapter'>; author: 'Author' }>
  *   }
  * }
  * ```
@@ -71,7 +71,7 @@ export interface ResourceMeta<Self = Resource> {
   /** True until the first load finished. A reload of a loaded entity does not set it. */
   readonly loading: boolean
   readonly status: RecordStatus | undefined
-  /** Type detected by the API adapter, e.g. `'Camp'`. */
+  /** Type detected by the API adapter, e.g. `'Book'`. */
   readonly type: string | undefined
   /** The raw relations of the entity. */
   readonly links: Readonly<Record<string, RelationRef>>
