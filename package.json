@@ -1,0 +1,84 @@
+{
+  "name": "halc",
+  "version": "1.0.0",
+  "description": "The HAL client that does the heavy lifting for talking to your HAL (or other linked data) API",
+  "keywords": [
+    "HAL",
+    "hal+json",
+    "HATEOAS",
+    "API",
+    "REST",
+    "client",
+    "normalizer",
+    "Vue",
+    "Pinia",
+    "Vuex"
+  ],
+  "homepage": "https://github.com/ecamp/halc#readme",
+  "bugs": {
+    "url": "https://github.com/ecamp/halc/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ecamp/halc.git"
+  },
+  "license": "MIT",
+  "contributors": [
+    "Carlo Beltrame",
+    "Urban Suppiger",
+    "Manuel Meister"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "./dist/testing/vitest.js"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "npm run build:js && npm run build:types",
+    "build:js": "tsup",
+    "build:types": "node node_modules/typescript7/bin/tsc -p tsconfig.build.json",
+    "clean": "rm -rf dist coverage",
+    "typecheck": "node node_modules/typescript7/bin/tsc --noEmit",
+    "lint": "eslint . && prettier --check .",
+    "lint:fix": "eslint . --fix && prettier --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "bench": "vitest bench --run",
+    "check:package": "publint --strict && attw --pack . --profile esm-only",
+    "prepack": "npm run clean && npm run build"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.19.2",
+    "@vitest/coverage-v8": "5.0.5",
+    "eslint": "10.13.0",
+    "eslint-plugin-import-x": "4.17.1",
+    "globals": "17.13.0",
+    "prettier": "3.9.10",
+    "publint": "0.3.25",
+    "tsup": "9.0.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.0",
+    "typescript7": "npm:typescript@7.0.2",
+    "vitest": "5.0.5"
+  },
+  "dependencies": {
+    "url-template": "^3.1.1"
+  }
+}
