@@ -23,6 +23,9 @@ npm run check:package       # publint + are-the-types-wrong; run after build
 
 Before committing: `npm run lint`, `npm run typecheck` and `npm test` must pass.
 
+Releases are published by `.github/workflows/release.yml` when a GitHub release is published; the
+steps are in the `release` skill (`.agents/skills/release/SKILL.md`, `.claude` links to `.agents`).
+
 TypeScript 7 (`typescript7`, an npm alias) typechecks and emits declarations. TypeScript 6
 (`typescript`) is only there as the compiler API for typescript-eslint, which does not support TS 7
 yet. Don't call `npx tsc` (that is TS 6); use the scripts.

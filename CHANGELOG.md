@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file. The format is b
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - Unreleased
+## [Unreleased]
 
 First release of halc, the successor of hal-json-vuex 3 and hal-json-normalizer 5
 ([RFC](https://github.com/ecamp/ecamp3/issues/11062)). See the README for the migration guide.
@@ -25,4 +25,4 @@ First release of halc, the successor of hal-json-vuex 3 and hal-json-normalizer 
 - Optional `ResourceMap` typing for entity properties and relations.
 - `halc/testing`: fixtures, an in-memory mock server, `toMatchRequests`.
 
-[1.0.0]: https://github.com/ecamp/halc/releases/tag/v1.0.0
+[Unreleased]: https://github.com/ecamp/halc/commits/main

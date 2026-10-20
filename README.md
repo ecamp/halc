@@ -507,6 +507,8 @@ npm run build         # dist/: bundled ESM, declarations and source maps
 npm run check:package # publint and are-the-types-wrong on the packed package
 ```
 
+How to release is described in [`.agents/skills/release/SKILL.md`](.agents/skills/release/SKILL.md).
+
 Sources are typechecked and their declarations emitted by TypeScript 7; TypeScript 6 is only
 installed as the compiler API that typescript-eslint needs.
 
