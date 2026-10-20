@@ -120,7 +120,6 @@
     "@vitest/coverage-v8": "5.0.5",
     "@vue/test-utils": "2.5.1",
     "eslint": "10.13.0",
-    "eslint-plugin-import-x": "4.17.1",
     "globals": "17.13.0",
     "happy-dom": "21.0.4",
     "pinia": "4.1.0",

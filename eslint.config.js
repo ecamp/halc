@@ -1,6 +1,5 @@
 import js from '@eslint/js'
 import { defineConfig, globalIgnores } from 'eslint/config'
-import importX from 'eslint-plugin-import-x'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
@@ -28,34 +27,43 @@ export default defineConfig(
       ],
     },
   },
+  // Dependencies point inward only: every subpath module may import from the core, the core
+  // imports from none of them, and the subpath modules don't import each other. This keeps a
+  // later split into separate packages mechanical.
   {
-    // Dependencies point inward only: every subpath module may import from the core,
-    // the core imports from none of them, and the subpath modules don't import each other.
-    // This keeps a later split into separate packages mechanical.
-    files: ['src/**/*.ts'],
-    plugins: { 'import-x': importX },
+    files: ['src/core/**/*.ts'],
     rules: {
-      'import-x/no-restricted-paths': [
+      'no-restricted-imports': [
         'error',
         {
-          zones: [
+          patterns: [
             {
-              target: './src/core',
-              from: adapters.map((adapter) => `./src/${adapter}`),
+              group: adapters.map((adapter) => `../${adapter}/*`),
               message: 'The core must not depend on any adapter.',
             },
-            ...adapters.map((adapter) => ({
-              target: `./src/${adapter}`,
-              from: adapters
-                .filter((other) => other !== adapter)
-                .map((other) => `./src/${other}`),
-              message: 'Adapters may only depend on the core.',
-            })),
           ],
         },
       ],
     },
   },
+  ...adapters.map((adapter) => ({
+    files: [`src/${adapter}/**/*.ts`],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: adapters
+                .filter((other) => other !== adapter)
+                .map((other) => `../${other}/*`),
+              message: 'Adapters may only depend on the core.',
+            },
+          ],
+        },
+      ],
+    },
+  })),
   {
     files: ['test/**/*.ts', 'bench/**/*.ts'],
     rules: {
