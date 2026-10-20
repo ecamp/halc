@@ -180,7 +180,11 @@ export type Preprocessor<T = Resource> = (entity: T, ctx: PreprocessorContext) =
 
 export type Preprocessors = {
   [K in TypeName]?: Preprocessor<BaseOf<K>>
-} & Record<string, Preprocessor>
+} & {
+  // Types without a ResourceMap entry are not checked.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [type: string]: Preprocessor<any> | undefined
+}
 
 /** Derives {@link PreprocessedFields} from a preprocessors object. */
 export type InferPreprocessed<P> = {
