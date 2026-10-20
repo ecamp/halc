@@ -74,7 +74,8 @@ export function halcVue(client: Client, options: HalcVueOptions = {}): Plugin {
 
 /** The client provided by {@link halcVue}, for `setup()` code. */
 export function useApi(): Client {
-  const client = inject(apiKey)
+  // With a default, Vue does not warn about the missing injection; we throw a clearer error.
+  const client = inject(apiKey, null)
   if (!client)
     throw new Error('No halc client provided. Did you app.use(halcVue(client))?')
   return client

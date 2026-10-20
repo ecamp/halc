@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it } from 'vitest'
-import { defineComponent, h, nextTick } from 'vue'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createApp, defineComponent, h, nextTick } from 'vue'
 import { createHalc } from '../../src/core/client.js'
 import { noopReactivity } from '../../src/core/noopReactivity.js'
 import { hal } from '../../src/hal/index.js'
@@ -11,6 +11,13 @@ import { createApi, flush } from '../helpers.js'
 
 beforeEach(() => {
   resetFixtureIds()
+  vi.spyOn(console, 'warn')
+})
+
+afterEach(() => {
+  // Vue reports problems as warnings, which would otherwise go unnoticed in a passing test.
+  expect(console.warn).not.toHaveBeenCalled()
+  vi.restoreAllMocks()
 })
 
 describe('halcVue', () => {
@@ -42,9 +49,8 @@ describe('halcVue', () => {
   })
 
   it('throws from useApi() without the plugin', () => {
-    expect(() =>
-      mount(defineComponent({ setup: () => (useApi(), () => h('div')) }))
-    ).toThrow('No halc client provided')
+    const app = createApp({})
+    expect(() => app.runWithContext(() => useApi())).toThrow('No halc client provided')
   })
 
   it('re-renders only the components whose resources changed', async () => {
