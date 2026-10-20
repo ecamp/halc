@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // Tests index into arrays they just asserted on; strictness here only adds noise.
+    "noUncheckedIndexedAccess": false,
+    "types": ["node"]
+  },
+  "include": [".", "../src", "../bench"]
+}

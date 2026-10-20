@@ -51,7 +51,7 @@ describe('HAL normalizer', () => {
       ['/periods/2', 'Period'],
       ['/periods/2', 'Period'],
     ])
-    expect(records[0]?.data).toEqual({
+    expect(records[0].data).toEqual({
       id: 1,
       creator: { href: '/users/7' },
       periods: { hrefs: ['/periods/2'] },
@@ -71,7 +71,7 @@ describe('HAL normalizer', () => {
       data: { items: { hrefs: ['/activities/3'] }, totalItems: 1 },
       meta: { type: 'Activity', resource: '/activities' },
     })
-    expect(item?.uri).toBe('/activities/3')
+    expect(item.uri).toBe('/activities/3')
   })
 
   it('keeps templated links unexpanded and drops link attributes', () => {
@@ -84,9 +84,9 @@ describe('HAL normalizer', () => {
       },
     })
 
-    expect(record?.uri).toBe('')
-    expect(record?.meta.type).toBe('Root')
-    expect(record?.data).toEqual({
+    expect(record.uri).toBe('')
+    expect(record.meta.type).toBe('Root')
+    expect(record.data).toEqual({
       camps: { href: '/api/camps{/id}', templated: true },
       login: { href: '/authentication_token' },
     })
@@ -98,7 +98,7 @@ describe('HAL normalizer', () => {
       _embedded: { creator: { _links: { self: { href: '/api/users/1' } } } },
     })
     expect(records).toHaveLength(1)
-    expect(records[0]?.data.creator).toEqual({ href: '/users/1' })
+    expect(records[0].data.creator).toEqual({ href: '/users/1' })
   })
 
   it('keeps embedded plain objects and lists as data', () => {
@@ -111,7 +111,7 @@ describe('HAL normalizer', () => {
         nothing: null,
       },
     })
-    expect(record?.data).toEqual({
+    expect(record.data).toEqual({
       settings: { color: 'red' },
       tags: [{ name: 'a' }],
       empty: { hrefs: [] },
@@ -181,7 +181,7 @@ describe('HAL adapter', () => {
         { _links: { self: { href: '/x' } } },
         new Headers(),
         context
-      )[0]?.meta.type
+      )[0].meta.type
     ).toBe('Thing')
   })
 })
