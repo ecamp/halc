@@ -118,16 +118,6 @@ class ResourceWrapper {
     return (internals.meta ??= new ResourceMetaView(internals.client, internals.uri))
   }
 
-  get items(): readonly Resource[] {
-    const { client, uri } = this[INTERNAL]
-    return client.collectionItems(uri, false)
-  }
-
-  get allItems(): readonly Resource[] {
-    const { client, uri } = this[INTERNAL]
-    return client.collectionItems(uri, true)
-  }
-
   $reload(): Promise<Resource> {
     const { client, uri } = this[INTERNAL]
     return client.reload(uri)
@@ -192,6 +182,22 @@ class ResourceWrapper {
   }
 }
 
+/**
+ * Wrapper of a collection. Only collections have `items`, so `'items' in wrapper` tells them
+ * apart from other resources (as in hal-json-vuex).
+ */
+class CollectionWrapper extends ResourceWrapper {
+  get items(): readonly Resource[] {
+    const { client, uri } = this[INTERNAL]
+    return client.collectionItems(uri, false)
+  }
+
+  get allItems(): readonly Resource[] {
+    const { client, uri } = this[INTERNAL]
+    return client.collectionItems(uri, true)
+  }
+}
+
 function relationAccessor(
   wrapper: ResourceWrapper,
   key: string
@@ -233,7 +239,8 @@ function propertyDescriptor(key: string): PropertyDescriptor {
   return descriptor
 }
 
-const RESERVED_KEYS = new Set(['_meta', 'items', 'allItems'])
+const RESERVED_KEYS = new Set(['_meta'])
+const RESERVED_COLLECTION_KEYS = new Set(['_meta', 'items', 'allItems'])
 
 // `_meta` is an own enumerable property (as in hal-json-vuex), so `{ ...entity }` keeps it.
 const metaDescriptor: PropertyDescriptor = {
@@ -255,15 +262,13 @@ export class WrapperFactory {
 
   create(uri: string, record: EntityRecord): Resource {
     const type = record.meta.type ?? ''
-    const Wrapper = this.classFor(type)
+    const collection = isCollectionRecord(record)
+    const Wrapper = this.classFor(type, collection)
     const wrapper = new Wrapper({ client: this.client, uri })
-    const keys = Object.keys(currentData(record)).filter((key) => !RESERVED_KEYS.has(key))
+    const reserved = collection ? RESERVED_COLLECTION_KEYS : RESERVED_KEYS
+    const keys = Object.keys(currentData(record)).filter((key) => !reserved.has(key))
     Object.defineProperties(wrapper, this.descriptorsFor(keys))
-    if (
-      this.client.hasPreprocessor(type) &&
-      !this.derivedKeys.has(type) &&
-      !isCollectionRecord(record)
-    ) {
+    if (this.client.hasPreprocessor(type) && !this.derivedKeys.has(type) && !collection) {
       // Run once to learn which derived fields this type has.
       this.client.derived(wrapper as unknown as Resource, undefined)
     }
@@ -277,7 +282,7 @@ export class WrapperFactory {
       known = new Set()
       this.derivedKeys.set(type, known)
     }
-    const prototype = this.classFor(type).prototype
+    const prototype = this.classFor(type, false).prototype
     for (const key of keys) {
       if (known.has(key)) continue
       known.add(key)
@@ -292,12 +297,18 @@ export class WrapperFactory {
     }
   }
 
-  private classFor(type: string): typeof ResourceWrapper {
-    let Wrapper = this.classes.get(type)
+  private classFor(type: string, collection: boolean): typeof ResourceWrapper {
+    const key = `${type}\u0000${String(collection)}`
+    let Wrapper = this.classes.get(key)
     if (!Wrapper) {
-      Wrapper = class extends ResourceWrapper {}
-      Object.defineProperty(Wrapper, 'name', { value: type || 'Resource' })
-      this.classes.set(type, Wrapper)
+      Wrapper = collection
+        ? class extends CollectionWrapper {}
+        : class extends ResourceWrapper {}
+      const name = type || 'Resource'
+      Object.defineProperty(Wrapper, 'name', {
+        value: collection ? `${name}Collection` : name,
+      })
+      this.classes.set(key, Wrapper)
     }
     return Wrapper
   }

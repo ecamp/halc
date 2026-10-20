@@ -221,6 +221,21 @@ describe('post', () => {
     ])
   })
 
+  it('does not reload a collection whose last load failed', async () => {
+    const api = createApi()
+    api.mock.get('/api/camps').reply(400)
+    api.mock.post('/api/camps').reply(201, {
+      _links: { self: { href: '/api/camps/1' } },
+      title: 't',
+    })
+    await api.get('/camps')._meta.load.catch(() => undefined)
+
+    await api.post('/camps', { title: 't' })
+    await flush()
+
+    expect(api.mock.requests.map((request) => request.method)).toEqual(['GET', 'POST'])
+  })
+
   it('removes the temporary item and rejects when the API refuses', async () => {
     const { api, activities, collection } = await loadedCollection()
     api.mock.post(activities).reply(422, { detail: 'nope' })
@@ -335,5 +350,34 @@ describe('del', () => {
     expect(current.items).toHaveLength(2)
     expect(current.items[0]._meta.deleting).toBe(false)
     expect(current.items[0]._meta.error?.status).toBe(403)
+  })
+})
+
+describe('temporary items of optimistic POSTs', () => {
+  it('have working relations', async () => {
+    const api = createApi()
+    const camp = fixture('Camp', { title: 'c' })
+    const category = fixture('Category', { name: 'LS' })
+    const existing = fixture('Activity', { title: 'Hike', camp, category })
+    const activities = collectionFixture('Activity', [existing])
+    api.mock.get(activities)
+    api.mock.get(camp)
+    api.mock.get(category)
+    const collection = await api.get(activities._meta.self)._meta.load
+    const loadedCamp = await api.get(camp._meta.self)._meta.load
+    api.mock.post(activities).delay(5)
+
+    const post = collection.$post({
+      title: 'Swim',
+      camp: loadedCamp, // a wrapper
+      category: category._meta.self, // an IRI, a relation on the existing items
+      location: '/somewhere', // a string that is no relation
+    })
+    const temporary = api.get(activities._meta.self).items[1]
+
+    expect(temporary.camp()._meta.self).toBe('/camps/000000000001')
+    expect(temporary.category()._meta.self).toBe('/categories/000000000002')
+    expect(temporary.location).toBe('/somewhere')
+    await post
   })
 })

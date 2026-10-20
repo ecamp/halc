@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { bodyForPost, diffForPatch, MutationQueue } from '../../src/core/mutations.js'
+import {
+  bodyForPost,
+  diffForPatch,
+  mergePatch,
+  MutationQueue,
+} from '../../src/core/mutations.js'
 import type { EntityRecord } from '../../src/core/records.js'
 import { createUriNormalizer } from '../../src/core/uri.js'
 import { deepEqual, deepFreeze } from '../../src/core/util.js'
@@ -179,5 +184,38 @@ describe('util', () => {
   it('freezes recursively', () => {
     const value = deepFreeze({ a: { b: [1] } })
     expect(Object.isFrozen(value.a.b)).toBe(true)
+  })
+})
+
+describe('diffForPatch with nested objects', () => {
+  const current = {
+    data: { sections: { a: { column1: 'A1', column2: 'A2' }, b: { column1: 'B1' } } },
+  }
+
+  it('merges the patch into the current object for the optimistic value (RFC 7386)', () => {
+    const diff = diffForPatch(
+      current,
+      { data: { sections: { a: { column1: 'NEW' }, b: null } } },
+      context
+    )
+
+    expect(diff.body).toEqual({ data: { sections: { a: { column1: 'NEW' }, b: null } } })
+    expect(diff.dirty).toEqual({
+      data: { sections: { a: { column1: 'NEW', column2: 'A2' } } },
+    })
+  })
+
+  it('sends nothing when the merge changes nothing', () => {
+    expect(
+      diffForPatch(current, { data: { sections: { a: { column1: 'A1' } } } }, context)
+        .body
+    ).toEqual({})
+  })
+
+  it('replaces arrays and primitives', () => {
+    expect(mergePatch({ a: [1, 2], b: 1 }, { a: [3], b: { c: 1 } })).toEqual({
+      a: [3],
+      b: { c: 1 },
+    })
   })
 })

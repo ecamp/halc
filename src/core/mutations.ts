@@ -1,6 +1,7 @@
 import {
   isCollectionRef,
   isLinkRef,
+  isRelationRef,
   type CollectionRef,
   type EntityRecord,
 } from './records.js'
@@ -135,7 +136,27 @@ function toRecordValue(current: unknown, value: unknown, context: DiffContext): 
     if (hrefs.every((href) => typeof href === 'string')) return { hrefs }
   }
   if (value === undefined) return undefined
-  return JSON.parse(JSON.stringify(value)) as unknown
+  const json = JSON.parse(JSON.stringify(value)) as unknown
+  // A PATCH is a JSON merge patch (RFC 7386): an object updates the current object field by
+  // field (null removes a field), so the optimistic value keeps the fields it doesn't mention.
+  return isJsonObject(current) && isJsonObject(json) && !isRelationRef(current)
+    ? mergePatch(current, json)
+    : json
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** Applies a JSON merge patch (RFC 7386). */
+export function mergePatch(target: unknown, patch: unknown): unknown {
+  if (!isJsonObject(patch)) return patch
+  const result: Record<string, unknown> = isJsonObject(target) ? { ...target } : {}
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null) Reflect.deleteProperty(result, key)
+    else result[key] = mergePatch(result[key], value)
+  }
+  return result
 }
 
 export interface PatchDiff {

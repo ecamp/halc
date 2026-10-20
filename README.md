@@ -166,6 +166,7 @@ chapters.allItems // including those being deleted
 await chapters.$loadItems() // waits until every item settled
 ```
 
+Only collections have `items` (as in hal-json-vuex, `'items' in resource` tells them apart).
 `items` is `[]` while the collection loads, never `undefined`. Items that are not in the store are
 loaded on access (with `avoidNPlusOneRequests`, the collection itself is reloaded first, in the hope
 that the API embeds them). `$loadItems()` settles per item: an item that fails gets `_meta.error`, the
@@ -211,9 +212,11 @@ lists the ones in flight.
 - **PATCH** sends only the top-level fields whose value changed, so `$patch({ ...form })` transmits
   only what the user touched, and nothing if nothing changed. Relations can be given as URIs or
   wrappers; wrappers are sent as IRIs. `{ force: true }` sends every given field. The body is a JSON
-  merge patch (`application/merge-patch+json`). After a `409 Conflict`, the resource is reloaded. A
+  merge patch (`application/merge-patch+json`): nested objects update the current value field by
+  field, also in the optimistic state. After a `409 Conflict`, the resource is reloaded. A
   `204 No Content` keeps the change and reloads the resource.
-- **POST** adds a temporary item (`urn:tmp:…`) to the collection, replaces it with the created
+- **POST** adds a temporary item (`urn:tmp:…`, with the posted data; values that are relations
+  become relation functions) to the collection, replaces it with the created
   resource when the API answers, and then reloads the collection, so server-side ordering and filters
   win (`{ reload: false }` skips that). A `204` with a `Location` header loads that URI. Post to the
   URI of the collection you display (e.g. `book.chapters()`) to see the new item at once.

@@ -564,7 +564,9 @@ export class HalcClient implements Client {
           version: this.nextVersion(),
           status: 'loaded',
           loadedAt: Date.now(),
-          dirty: deepFreeze(JSON.parse(JSON.stringify(body)) as Record<string, unknown>),
+          dirty: deepFreeze(
+            this.temporaryData(collection as EntityRecord, data ?? {}, body)
+          ),
           ...(type === undefined ? {} : { type }),
         },
       }
@@ -596,7 +598,8 @@ export class HalcClient implements Client {
       )
 
     const createdUri = await created
-    if (options.reload !== false && this.store.has(uri)) {
+    // Only collections that are loaded (not ones whose last load failed) are reloaded.
+    if (options.reload !== false && isLoaded(this.store.get(uri))) {
       void this.load(uri, false, true).catch(ignore)
     }
     return createdUri === null ? null : this.wrapperFor(createdUri)
@@ -705,6 +708,50 @@ export class HalcClient implements Client {
       )
     }
     return uri
+  }
+
+  /**
+   * The data of the temporary record of an optimistic POST. Values that are relations become
+   * relation refs, so `item.relation()` works on the temporary item too: values given as wrappers,
+   * fields that are relations on the items already in the collection, and IRIs of resources in
+   * the store.
+   */
+  private temporaryData(
+    collection: EntityRecord,
+    data: Record<string, unknown>,
+    body: Record<string, unknown> | undefined
+  ): Record<string, unknown> {
+    const items = currentValue(collection, 'items')
+    const sibling = isCollectionRef(items)
+      ? items.hrefs.map((href) => this.store.get(href)).find(isLoaded)
+      : undefined
+    const isRelation = (key: string, given: unknown, value: unknown): boolean => {
+      const siblingValue = sibling ? currentValue(sibling, key) : undefined
+      if (isLinkRef(siblingValue) || isCollectionRef(siblingValue)) return true
+      if (typeof given === 'object' && given !== null && '_meta' in given) return true
+      return typeof value === 'string' && this.store.has(this.normalizeUri(value))
+    }
+    const result: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(
+      JSON.parse(JSON.stringify(body ?? {})) as Record<string, unknown>
+    )) {
+      const given = data[key]
+      if (typeof value === 'string' && isRelation(key, given, value)) {
+        result[key] = { href: this.normalizeUri(value) }
+      } else if (
+        Array.isArray(value) &&
+        value.length > 0 &&
+        value.every((entry) => typeof entry === 'string') &&
+        isRelation(key, Array.isArray(given) ? given[0] : given, value[0])
+      ) {
+        result[key] = {
+          hrefs: value.map((entry) => this.normalizeUri(entry)),
+        }
+      } else {
+        result[key] = value
+      }
+    }
+    return result
   }
 
   /**

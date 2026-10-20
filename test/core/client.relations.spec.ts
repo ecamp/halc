@@ -183,15 +183,27 @@ describe('collections', () => {
     expect(api.mock.requests).toHaveLength(1)
   })
 
-  it('returns empty items for unloaded collections and non-collections', async () => {
+  it('returns empty items for unloaded collections, and none for other resources', async () => {
     const api = createApi()
-    const camp = fixture('Camp')
+    const camp = fixture('Camp', { title: 'x' })
     api.mock.get('/api/activities').delay(5).reply(200, collectionFixture('Activity', []))
     api.mock.get(camp)
 
     expect(api.get('/activities').items).toEqual([])
     expect(api.get('/activities').allItems).toEqual([])
-    expect((await api.get(camp._meta.self)._meta.load).items).toEqual([])
+    const loaded = await api.get(camp._meta.self)._meta.load
+    // As in hal-json-vuex, `'items' in resource` tells collections apart.
+    expect('items' in loaded).toBe(false)
+    expect(loaded.items).toBeUndefined()
+    expect('items' in (await api.get('/activities')._meta.load)).toBe(true)
+  })
+
+  it('exposes a property named items of non-collections like any other', async () => {
+    const api = createApi()
+    api.mock
+      .get('/api/carts/1')
+      .reply(200, { _links: { self: { href: '/api/carts/1' } }, items: 3 })
+    expect((await api.get('/carts/1')._meta.load).items).toBe(3)
   })
 
   it('handles embedded lists without a URI of their own as virtual collections', async () => {
