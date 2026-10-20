@@ -12,31 +12,52 @@ jobs:
   publish:
     name: Publish to npm
     runs-on: ubuntu-latest
-    # Configure required reviewers on this environment to approve each release.
+    # Require reviewers and restrict deployments to tags matching v* on this environment.
     environment: npm
     permissions:
       contents: read
       # npm trusted publishing (OIDC): no npm token is stored in the repository.
       id-token: write
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # No dependency cache in the job that can publish: a poisoned cache must not reach npm.
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version-file: .nvmrc
           registry-url: https://registry.npmjs.org
-          cache: npm
 
-      - name: Check that the tag matches the package version
+      - name: Check tag, version and release type
+        id: version
         env:
           TAG: ${{ github.event.release.tag_name }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
         run: |
           VERSION="$(node -p "require('./package.json').version")"
           if [ "$TAG" != "v$VERSION" ]; then
             echo "::error::Release tag $TAG does not match package.json version $VERSION"
             exit 1
           fi
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::Release tag $TAG does not point to a commit on main"
+            exit 1
+          fi
+          # Prereleases (e.g. 1.1.0-beta.1) go to the `next` dist-tag, so `npm install halc`
+          # keeps installing the latest stable version. The release flag must agree.
+          case "$VERSION" in
+            *-*) DIST_TAG=next; EXPECTED_PRERELEASE=true ;;
+            *) DIST_TAG=latest; EXPECTED_PRERELEASE=false ;;
+          esac
+          if [ "$PRERELEASE" != "$EXPECTED_PRERELEASE" ]; then
+            echo "::error::Version $VERSION needs the GitHub release to be marked prerelease=$EXPECTED_PRERELEASE"
+            exit 1
+          fi
+          echo "dist-tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
 
-      - run: npm ci
+      # Install scripts are not needed (esbuild ships its binary as optional dependency).
+      - run: npm ci --ignore-scripts
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
@@ -45,12 +66,5 @@ jobs:
 
       - name: Publish
         env:
-          PRERELEASE: ${{ github.event.release.prerelease }}
-        run: |
-          # Prereleases (e.g. 1.1.0-beta.1) go to the `next` dist-tag, so `npm install halc`
-          # keeps installing the latest stable version.
-          if [ "$PRERELEASE" = "true" ]; then
-            npm publish --provenance --access public --tag next
-          else
-            npm publish --provenance --access public
-          fi
+          DIST_TAG: ${{ steps.version.outputs.dist-tag }}
+        run: npm publish --provenance --access public --tag "$DIST_TAG"

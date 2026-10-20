@@ -7,8 +7,9 @@ description: Release a new version of halc to npm. Use when the user wants to re
 
 Releases are published to npm by the GitHub Actions workflow `.github/workflows/release.yml`
 whenever a GitHub release is published. The workflow checks that the tag (`vX.Y.Z`) matches the
-version in `package.json`, runs lint, typecheck, tests, build and the package checks, and publishes
-with npm trusted publishing (OIDC, with provenance). Prereleases go to the npm dist-tag `next`.
+version in `package.json` and points to a commit on `main`, runs lint, typecheck, tests, build and
+the package checks, and publishes with npm trusted publishing (OIDC, with provenance). Prereleases
+go to the npm dist-tag `next`.
 
 A release therefore consists of: a release commit on `main` (version + changelog), a tag, and a
 GitHub release. Follow these steps; a human can follow them just the same.
@@ -69,8 +70,10 @@ allows unpublishing within 72 hours, and never reusing a version).
 ```bash
 git tag -a v<version> -m "v<version>"
 git push origin main v<version>
-gh release create v<version> --title "v<version>" --notes-file <(sed -n '/^## \[<version>\]/,/^## \[/p' CHANGELOG.md | sed '1d;$d')
-# for a prerelease, add --prerelease
+# Release notes: the changelog section of this version, without its heading and link references
+gh release create v<version> --title "v<version>" --notes-file <(awk '/^## \[<version>\]/{found=1; next} found && /^(## \[|\[)/{exit} found' CHANGELOG.md)
+# for a prerelease (a version with "-", e.g. 1.1.0-beta.1), add --prerelease: the workflow checks
+# that the flag matches the version
 ```
 
 ## 5. Follow the publish
@@ -86,8 +89,10 @@ publishing, the version is taken: release a new patch version instead.
 
 ## One-time setup (before the first release)
 
-1. On GitHub (ecamp/halc → Settings → Environments), create the environment `npm`, optionally with
-   required reviewers so every release needs an approval.
+1. On GitHub (ecamp/halc → Settings → Environments), create the environment `npm` with required
+   reviewers (every release needs an approval) and a deployment branch and tag rule that only
+   allows tags matching `v*`. Protect the `v*` tags (Settings → Rules) so only maintainers can
+   create them.
 2. npm trusted publishing can only be configured for a package that exists. Publish the first
    version once by hand from a clean checkout of the release commit, by an owner of the npm package
    name (with 2FA):
