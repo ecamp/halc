@@ -113,3 +113,74 @@ describe('reactivity contract', () => {
     expect(tracked.has('/camps/1')).toBe(true)
   })
 })
+
+describe('placeholders after loading', () => {
+  it('behave like the loaded wrapper for spreads, `in` and descriptors', async () => {
+    const api = createApi()
+    const camp = fixture('Camp', { title: 'x', creator: fixture('User') })
+    api.mock.get(camp)
+
+    const placeholder = api.get(camp._meta.self)
+    expect('title' in placeholder).toBe(false)
+    expect('_meta' in placeholder).toBe(true)
+    expect(Object.keys(placeholder)).toEqual([])
+    await placeholder._meta.load
+
+    expect('title' in placeholder).toBe(true)
+    expect(Object.keys(placeholder)).toEqual(['title', 'creator'])
+    const { title, creator } = { ...placeholder }
+    expect(title).toBe('x')
+    expect(creator()._meta.self).toBe('/users/000000000001')
+    expect(Object.getOwnPropertyDescriptor(placeholder, 'title')).toMatchObject({
+      value: 'x',
+      enumerable: true,
+    })
+    expect(Object.getOwnPropertyDescriptor(placeholder, 'missing')).toBeUndefined()
+  })
+
+  it('delegate mutations and links of unloaded resources', async () => {
+    const api = createApi()
+    const camp = fixture('Camp', { creator: fixture('User') })
+    api.mock.get(camp).delay(5)
+
+    const placeholder = api.get(camp._meta.self)
+    expect(placeholder.$hrefSync('creator')).toBeUndefined()
+    expect(placeholder.$hrefsSync('creator')).toBeUndefined()
+    expect(placeholder.as()).toBe(placeholder)
+    await expect(placeholder.$href('creator')).resolves.toBe('/users/000000000001')
+    await expect(placeholder.$reload()).resolves.toBeDefined()
+    expect(placeholder.$rel('creator')._meta.self).toBe('/users/000000000001')
+  })
+})
+
+describe('virtual collections', () => {
+  it('offer links, JSON and item loading', async () => {
+    const api = createApi({ avoidNPlusOneRequests: false })
+    api.mock.get('/api/camps/1').reply(200, {
+      _links: { self: { href: '/api/camps/1' }, periods: [{ href: '/api/periods/1' }] },
+    })
+    api.mock
+      .get('/api/periods/1')
+      .reply(200, { _links: { self: { href: '/api/periods/1' } }, a: 1 })
+
+    const periods = (await api.get('/camps/1')._meta.load).periods()
+    expect(periods.$hrefSync('self')).toBe('/camps/1#periods')
+    expect(periods.$hrefSync('other')).toBeUndefined()
+    expect(periods.$hrefsSync('items')).toEqual(['/periods/1'])
+    await expect(periods.$href('self')).resolves.toBe('/camps/1#periods')
+    await expect(periods.$hrefs('items')).resolves.toEqual(['/periods/1'])
+    expect(periods.toJSON()).toEqual({
+      items: ['/periods/1'],
+      _meta: { self: '/camps/1#periods' },
+    })
+    expect(periods._meta.links).toEqual({})
+    expect(periods._meta.deleting).toBe(false)
+    expect(periods._meta.status).toBe('loaded')
+    expect(periods._meta.selfUrl).toBe('http://localhost/api/camps/1#periods')
+    expect(periods.as()).toBe(periods)
+    expect(() => periods.$rel('x')).toThrow('Virtual resources have no relations')
+
+    const loaded = await periods.$loadItems()
+    expect(loaded.items[0]!.a).toBe(1)
+  })
+})
