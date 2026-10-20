@@ -53,6 +53,10 @@
       "types": "./dist/plain/index.d.ts",
       "default": "./dist/plain/index.js"
     },
+    "./vue": {
+      "types": "./dist/vue/index.d.ts",
+      "default": "./dist/vue/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
