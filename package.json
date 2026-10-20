@@ -82,10 +82,22 @@
     "url-template": "^3.1.1"
   },
   "peerDependencies": {
-    "vitest": ">=3"
+    "pinia": "^2.1.0 || ^3.0.0 || ^4.0.0",
+    "vitest": ">=3",
+    "vue": "^3.4.0",
+    "vuex": "^4.1.0"
   },
   "peerDependenciesMeta": {
+    "pinia": {
+      "optional": true
+    },
     "vitest": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    },
+    "vuex": {
       "optional": true
     }
   },
@@ -94,15 +106,20 @@
     "@eslint/js": "10.0.1",
     "@types/node": "24.19.2",
     "@vitest/coverage-v8": "5.0.5",
+    "@vue/test-utils": "2.5.1",
     "eslint": "10.13.0",
     "eslint-plugin-import-x": "4.17.1",
     "globals": "17.13.0",
+    "happy-dom": "21.0.4",
+    "pinia": "4.1.0",
     "prettier": "3.9.10",
     "publint": "0.3.25",
     "tsup": "9.0.0",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.0",
     "typescript7": "npm:typescript@7.0.2",
-    "vitest": "5.0.5"
+    "vitest": "5.0.5",
+    "vue": "3.5.44",
+    "vuex": "4.1.0"
   }
 }
