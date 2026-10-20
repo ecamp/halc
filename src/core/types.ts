@@ -223,6 +223,7 @@ export interface HalcOptions {
 
 export type { PendingMutation }
 
+/** The client. Its methods can be called detached, e.g. `const { get } = api`. */
 export interface Client {
   /**
    * Returns the wrapper for a URI. Loads the resource from the API if it is not in the store,
@@ -230,42 +231,47 @@ export interface Client {
    * Without argument, returns the API root.
    */
   get<K extends TypeName | undefined = undefined>(
+    this: void,
     uriOrEntity?: UriOrEntity
   ): K extends TypeName ? Of<K> : Resource
   /** Reloads a resource from the API, resolving to the updated wrapper. */
   reload<K extends TypeName | undefined = undefined>(
+    this: void,
     uriOrEntity: UriOrEntity
   ): Promise<K extends TypeName ? Of<K> : Resource>
   /** Creates a resource in a collection. Resolves to the created resource. */
   post(
+    this: void,
     uriOrCollection: UriOrEntity,
     data?: Record<string, unknown>,
     options?: PostOptions
   ): Promise<Resource | null>
   /** Updates the given fields of a resource; sends only fields that changed. */
   patch(
+    this: void,
     uriOrEntity: UriOrEntity,
     data: Record<string, unknown>,
     options?: PatchOptions
   ): Promise<Resource>
   /** Deletes a resource and reloads everything that referenced it. */
-  del(uriOrEntity: UriOrEntity, options?: MutationOptions): Promise<void>
+  del(this: void, uriOrEntity: UriOrEntity, options?: MutationOptions): Promise<void>
   /** URI of a relation of a resource, loading the resource if necessary. */
   href(
+    this: void,
     uriOrEntity: UriOrEntity,
     relation: string,
     params?: TemplateParams
   ): Promise<string | undefined>
   /** Marks a resource as outdated, so the next read reloads it. Clears a sticky error. */
-  invalidate(uriOrEntity: UriOrEntity): void
+  invalidate(this: void, uriOrEntity: UriOrEntity): void
   /** Removes a resource from the store, without telling the API. */
-  purge(uriOrEntity: UriOrEntity): void
+  purge(this: void, uriOrEntity: UriOrEntity): void
   /** Removes everything from the store, without telling the API. */
-  purgeAll(): void
+  purgeAll(this: void): void
   /** True if the store knows nothing about this URI. */
-  isUnknown(uri: string): boolean
+  isUnknown(this: void, uri: string): boolean
   /** The status of the record for this URI, undefined if unknown. */
-  status(uri: string): RecordStatus | undefined
+  status(this: void, uri: string): RecordStatus | undefined
   /** Mutations that are waiting for the API. */
   readonly pendingMutations: readonly PendingMutation[]
   readonly store: StoreAdapter
@@ -276,7 +282,7 @@ export interface Client {
    * Replaces the reactivity adapter. For framework integrations like `halc/vue`; call it before
    * reading anything.
    */
-  setReactivity(reactivity: ReactivityAdapter): void
+  setReactivity(this: void, reactivity: ReactivityAdapter): void
   /** Normalizes a URI the same way the store keys are normalized. */
   normalizeUri(uri: string): string
   /**

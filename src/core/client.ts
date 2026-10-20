@@ -65,6 +65,21 @@ import {
 
 const TEMP_URI_PREFIX = 'urn:tmp:'
 
+const BOUND_METHODS = [
+  'get',
+  'reload',
+  'post',
+  'patch',
+  'del',
+  'href',
+  'invalidate',
+  'purge',
+  'purgeAll',
+  'isUnknown',
+  'status',
+  'setReactivity',
+] as const
+
 function ignore(): void {
   // Errors of fire-and-forget work are recorded on the records, nobody needs to handle them here.
 }
@@ -129,6 +144,14 @@ export class HalcClient implements Client {
     this.currentReactivity = options.reactivity ?? noopReactivity
     this.transport = options.transport ?? createFetchTransport()
     this.retry = resolveRetryOptions(options.retry)
+    // Like the functions of hal-json-vuex, the methods work when passed around on their own
+    // (e.g. `const { get } = api` or `apiGet: api.get`).
+    for (const method of BOUND_METHODS) {
+      Object.defineProperty(this, method, {
+        value: this[method].bind(this),
+        writable: true,
+      })
+    }
     this.normalizeUri = createUriNormalizer(options.baseUrl)
     this.resolveUrl = createUrlResolver(options.baseUrl)
     this.diffContext = {

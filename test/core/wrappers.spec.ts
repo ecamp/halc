@@ -116,6 +116,21 @@ describe('reactivity contract', () => {
     expect(bumped).toEqual([])
   })
 
+  it('client methods work when detached from the client', async () => {
+    const api = createApi()
+    api.mock
+      .get('/api/camps/1')
+      .reply(200, { _links: { self: { href: '/api/camps/1' } }, a: 1 })
+    const { get, reload, isUnknown } = api
+    const component = {}
+
+    expect((await get('/camps/1')._meta.load).a).toBe(1)
+    // Bound to something else, like ecamp3's `this.api.get.bind(this)` in a component.
+    await expect((reload as any).call(component, '/camps/1')).resolves.toBeDefined()
+    expect((api.get as any).bind(component)('/camps/1').a).toBe(1)
+    expect(isUnknown('/camps/2')).toBe(true)
+  })
+
   it('can be replaced before use', () => {
     const { reactivity, tracked } = recordingReactivity()
     const api = createHalc({

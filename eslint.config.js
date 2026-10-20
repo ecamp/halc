@@ -21,6 +21,11 @@ export default defineConfig(
       // With an empty (augmentable) ResourceMap, `TypeName` is `never`, which this rule flags.
       '@typescript-eslint/no-redundant-type-constituents': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      // `this: void` marks methods that may be called detached from their object.
+      '@typescript-eslint/no-invalid-void-type': [
+        'error',
+        { allowAsThisParameter: true },
+      ],
       '@typescript-eslint/restrict-template-expressions': [
         'error',
         { allowNumber: true, allowBoolean: true },
