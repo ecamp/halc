@@ -46,6 +46,8 @@ import type {
   PatchOptions,
   PendingMutation,
   PostOptions,
+  Preprocessor,
+  PreprocessorContext,
   Of,
   Resource,
   TemplateParams,
@@ -91,6 +93,12 @@ interface CachedItems {
   items: readonly Resource[]
 }
 
+interface DerivedMemo {
+  version: number
+  dependencies: Map<string, number>
+  value: Record<string, unknown>
+}
+
 /** The client implementation. Use {@link createHalc} to create one. */
 export class HalcClient implements Client {
   readonly store: StoreAdapter
@@ -109,6 +117,7 @@ export class HalcClient implements Client {
   private readonly virtualWrappers = new Map<string, CachedWrapper>()
   private readonly itemsCache = new Map<string, CachedItems>()
   private readonly itemLoads = new Map<string, Promise<void>>()
+  private readonly derivedMemos = new Map<string, DerivedMemo>()
   private readonly pendingPosts = new Map<string, Promise<string | null>>()
   private readonly diffContext: DiffContext
   /** Incremented on every store write; invalidates cached `items` arrays. */
@@ -343,10 +352,7 @@ export class HalcClient implements Client {
     }
     if (!isLoaded(record)) {
       return Promise.reject(
-        new ApiError(`"${uri}" is not in the read-only store`, {
-          method: 'GET',
-          uri,
-        })
+        new ApiError(`"${uri}" is not in the read-only store`, { method: 'GET', uri })
       )
     }
     return Promise.resolve(this.wrapperFor(uri))
@@ -422,6 +428,60 @@ export class HalcClient implements Client {
     return this.followRelation(ownerUri, relation)
   }
 
+  /** @internal */
+  hasPreprocessor(type: string): boolean {
+    return this.preprocessorFor(type) !== undefined
+  }
+
+  /**
+   * @internal Reads a derived field, recomputing the preprocessor if the record or anything it
+   * read changed since the last run.
+   */
+  derived(wrapper: Resource, key: string | undefined): unknown {
+    const uri = wrapper._meta.self
+    this.reactivity.track(uri)
+    const record = this.store.get(uri)
+    if (!record || !isLoaded(record)) return undefined
+    const type = record.meta.type ?? ''
+    const preprocessor = this.preprocessorFor(type)
+    if (!preprocessor) return undefined
+
+    let memo = this.derivedMemos.get(uri)
+    const upToDate =
+      memo?.version === record.meta.version &&
+      [...memo.dependencies].every(
+        ([dependency, version]) =>
+          (this.store.get(dependency)?.meta.version ?? -1) === version
+      )
+    if (memo && upToDate) {
+      for (const dependency of memo.dependencies.keys()) this.reactivity.track(dependency)
+    } else {
+      const dependencies = new Map<string, number>()
+      const context: PreprocessorContext = {
+        get: (target) => {
+          if (target === undefined || target === null) return undefined
+          const normalized = this.normalizeUri(target)
+          const dependency = this.store.get(normalized)
+          dependencies.set(normalized, dependency?.meta.version ?? -1)
+          this.reactivity.track(normalized)
+          return isLoaded(dependency) ? this.wrapperFor(normalized) : undefined
+        },
+        hrefSync: (target, relation, params) => {
+          const normalized = this.normalizeUri(target)
+          dependencies.set(normalized, this.store.get(normalized)?.meta.version ?? -1)
+          return this.hrefSync(normalized, relation, params)
+        },
+        options: this.options,
+      }
+      // Wrappers read current values, so any wrapper of this URI is as good as the newest.
+      const value = { ...preprocessor(wrapper, context) } as Record<string, unknown>
+      memo = { version: record.meta.version, dependencies, value }
+      this.derivedMemos.set(uri, memo)
+      this.factory.defineDerived(type, Object.keys(value))
+    }
+    return key === undefined ? undefined : memo.value[key]
+  }
+
   // ---------------------------------------------------------------------------------------------
   // Mutations
 
@@ -441,13 +501,7 @@ export class HalcClient implements Client {
 
     const id = this.queue.nextId()
     const tempUri = optimistic ? `${TEMP_URI_PREFIX}${id}` : undefined
-    const mutation: PendingMutation = {
-      id,
-      kind: 'post',
-      uri,
-      body,
-      optimistic,
-    }
+    const mutation: PendingMutation = { id, kind: 'post', uri, body, optimistic }
     if (tempUri) mutation.tempUri = tempUri
     this.queue.add(mutation)
 
@@ -581,6 +635,10 @@ export class HalcClient implements Client {
   // ---------------------------------------------------------------------------------------------
   // Internals
 
+  private preprocessorFor(type: string): Preprocessor | undefined {
+    return type ? this.options.preprocessors?.[type] : undefined
+  }
+
   private uriOf(uriOrEntity: unknown): string | undefined {
     if (uriOrEntity === undefined) return ''
     if (typeof uriOrEntity === 'string') return this.normalizeUri(uriOrEntity)
@@ -671,11 +729,7 @@ export class HalcClient implements Client {
     if (hasUnknown && !this.store.readOnly) void loadUnknown().catch(ignore)
 
     const frozen = Object.freeze(items)
-    this.itemsCache.set(key, {
-      version,
-      generation: this.generation,
-      items: frozen,
-    })
+    this.itemsCache.set(key, { version, generation: this.generation, items: frozen })
     return frozen
   }
 
@@ -732,10 +786,7 @@ export class HalcClient implements Client {
     } else if (!isLoaded(record) && record.meta.status !== 'loading') {
       const patch: MetaPatch = { status: 'loading', error: undefined }
       if (silent)
-        this.store.patchMeta(uri, {
-          ...patch,
-          version: record.meta.version + 1,
-        })
+        this.store.patchMeta(uri, { ...patch, version: record.meta.version + 1 })
       else this.patchMeta(uri, patch)
     }
 
@@ -1014,6 +1065,7 @@ export class HalcClient implements Client {
     for (const uri of uris) {
       this.wrappers.delete(uri)
       this.placeholders.delete(uri)
+      this.derivedMemos.delete(uri)
       this.reactivity.bump(uri)
       this.reactivity.release?.(uri)
     }
@@ -1023,10 +1075,7 @@ export class HalcClient implements Client {
   private refreshDirty(uri: string, patch: MetaPatch = {}): void {
     const record = this.store.get(uri)
     if (!record) return
-    this.patchMeta(uri, {
-      ...patch,
-      dirty: deepFreeze(this.queue.dirtyFor(record)),
-    })
+    this.patchMeta(uri, { ...patch, dirty: deepFreeze(this.queue.dirtyFor(record)) })
   }
 
   /** Writes confirmed changes into the data of a record (for answers without content). */
@@ -1036,11 +1085,7 @@ export class HalcClient implements Client {
     const updated: EntityRecord = {
       uri,
       data: deepFreeze({ ...record.data, ...changes }),
-      meta: {
-        ...record.meta,
-        version: record.meta.version + 1,
-        status: 'stale',
-      },
+      meta: { ...record.meta, version: record.meta.version + 1, status: 'stale' },
     }
     const dirty = this.queue.dirtyFor(updated)
     if (dirty) updated.meta.dirty = dirty
@@ -1063,10 +1108,7 @@ export class HalcClient implements Client {
     }
     const updated: EntityRecord = {
       uri: collectionUri,
-      data: deepFreeze({
-        ...record.data,
-        items: { hrefs: [...hrefs, itemUri] },
-      }),
+      data: deepFreeze({ ...record.data, items: { hrefs: [...hrefs, itemUri] } }),
       meta: { ...record.meta, version: record.meta.version + 1 },
     }
     const dirty = this.queue.dirtyFor(updated)

@@ -25,11 +25,29 @@ import type { RetryOptions } from './retry.js'
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface ResourceMap {}
 
+/**
+ * Maps type names to the fields added by preprocessors. Augment it with
+ * {@link InferPreprocessed} to get completion on derived fields:
+ *
+ * ```ts
+ * declare module 'halc' {
+ *   interface PreprocessedFields extends InferPreprocessed<typeof preprocessors> {}
+ * }
+ * ```
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface PreprocessedFields {}
+
 /** All type names known from {@link ResourceMap}. */
 export type TypeName = Extract<keyof ResourceMap, string>
 
-/** The wrapper type for a type name. */
-export type Of<K> = K extends TypeName ? ResourceMap[K] : Resource
+type DerivedOf<K> = K extends keyof PreprocessedFields ? PreprocessedFields[K] : unknown
+
+/** The wrapper type for a type name, including fields from preprocessors. */
+export type Of<K> = K extends TypeName ? ResourceMap[K] & DerivedOf<K> : Resource
+
+/** The wrapper type for a type name, without fields from preprocessors. */
+export type BaseOf<K> = K extends TypeName ? ResourceMap[K] : Resource
 
 type TemplateValue = string | number | boolean | null | undefined
 export type TemplateParams = Record<
@@ -146,6 +164,29 @@ export type Entity<P, R = {}> = Readonly<P> &
 export type Collection<T = Resource> = ResourceApi<Collection<T>> &
   CollectionApi<RelationTarget<T>>
 
+export interface PreprocessorContext {
+  /** Reads another resource without triggering a request; undefined if it is not loaded. */
+  get(uri: string | null | undefined): Resource | undefined
+  /** URI of a relation of another resource, if available without a request. */
+  hrefSync(uri: string, relation: string, params?: TemplateParams): string | undefined
+  readonly options: Readonly<HalcOptions>
+}
+
+/**
+ * Computes derived fields for every entity of one type. Must be pure and must not send
+ * requests; reads of other resources go through `ctx.get`.
+ */
+export type Preprocessor<T = Resource> = (entity: T, ctx: PreprocessorContext) => object
+
+export type Preprocessors = {
+  [K in TypeName]?: Preprocessor<BaseOf<K>>
+} & Record<string, Preprocessor>
+
+/** Derives {@link PreprocessedFields} from a preprocessors object. */
+export type InferPreprocessed<P> = {
+  -readonly [K in keyof P]: P[K] extends (...args: never[]) => infer R ? R : never
+}
+
 export interface HalcOptions {
   /** Converts between the wire format and records, e.g. `hal` from `halc/hal`. */
   adapter: ApiAdapter
@@ -172,6 +213,8 @@ export interface HalcOptions {
   avoidNPlusOneRequests?: boolean
   /** Store a GET response under the requested URI, even if its self link differs. */
   forceRequestedSelfLink?: boolean
+  /** Derived fields per entity type. */
+  preprocessors?: Preprocessors
 }
 
 export type { PendingMutation }

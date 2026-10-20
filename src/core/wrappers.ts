@@ -233,10 +233,11 @@ function propertyDescriptor(key: string): PropertyDescriptor {
 
 const RESERVED_KEYS = new Set(['_meta', 'items', 'allItems'])
 
-/** Builds and caches wrapper classes per entity type. */
+/** Builds and caches wrapper classes per entity type, so derived getters can live on them. */
 export class WrapperFactory {
   private readonly classes = new Map<string, typeof ResourceWrapper>()
   private readonly descriptorSets = new Map<string, PropertyDescriptorMap>()
+  private readonly derivedKeys = new Map<string, Set<string>>()
 
   constructor(private readonly client: HalcClient) {}
 
@@ -246,7 +247,33 @@ export class WrapperFactory {
     const wrapper = new Wrapper({ client: this.client, uri })
     const keys = Object.keys(currentData(record)).filter((key) => !RESERVED_KEYS.has(key))
     Object.defineProperties(wrapper, this.descriptorsFor(keys))
+    if (this.client.hasPreprocessor(type) && !this.derivedKeys.has(type)) {
+      // Run once to learn which derived fields this type has.
+      this.client.derived(wrapper as unknown as Resource, undefined)
+    }
     return (this.client.reactivity.markRaw?.(wrapper) ?? wrapper) as unknown as Resource
+  }
+
+  /** Makes derived fields available as non-enumerable getters on all wrappers of a type. */
+  defineDerived(type: string, keys: string[]): void {
+    let known = this.derivedKeys.get(type)
+    if (!known) {
+      known = new Set()
+      this.derivedKeys.set(type, known)
+    }
+    const prototype = this.classFor(type).prototype
+    for (const key of keys) {
+      if (known.has(key)) continue
+      known.add(key)
+      if (key in prototype) continue
+      Object.defineProperty(prototype, key, {
+        get(this: ResourceWrapper) {
+          return this[INTERNAL].client.derived(this as unknown as Resource, key)
+        },
+        enumerable: false,
+        configurable: true,
+      })
+    }
   }
 
   private classFor(type: string): typeof ResourceWrapper {
