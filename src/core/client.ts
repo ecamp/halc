@@ -14,6 +14,7 @@ import {
   diffForPatch,
   MutationQueue,
   type DiffContext,
+  type PatchDiff,
 } from './mutations.js'
 import { noopReactivity } from './noopReactivity.js'
 import {
@@ -136,6 +137,17 @@ export class HalcClient implements Client {
   private readonly diffContext: DiffContext
   /** Incremented on every store write; invalidates cached `items` arrays. */
   private generation = 0
+  /** Source of record versions: never reused, also not after a record was purged. */
+  private version = 0
+  /**
+   * Write fence: `epoch` counts writes that must win over responses of requests that were
+   * already running (mutation results, invalidate, delete, purge). `touched` remembers the
+   * epoch of the last such write per URI, `purgedAt` the one of the last `purgeAll`.
+   */
+  private epoch = 0
+  private purgedAt = 0
+  private readonly touched = new Map<string, number>()
+  private readonly inflightSince = new Map<string, number>()
 
   constructor(options: HalcOptions) {
     this.options = options
@@ -248,19 +260,23 @@ export class HalcClient implements Client {
   isUnknown(uri: string): boolean {
     const normalized = this.normalizeUri(uri)
     const base = normalized.split('#')[0] ?? ''
+    this.reactivity.track(base)
     return !this.store.has(base) && !this.inflight.has(base)
   }
 
   status(uri: string): RecordStatus | undefined {
     const normalized = this.normalizeUri(uri)
-    const status = this.store.get(normalized)?.meta.status
-    return status ?? (this.inflight.has(normalized) ? 'loading' : undefined)
+    this.reactivity.track(normalized)
+    const record = this.store.get(normalized)
+    if (this.inflight.has(normalized) && !isLoaded(record)) return 'loading'
+    return record?.meta.status
   }
 
   invalidate(uriOrEntity: UriOrEntity): void {
     const uri = this.toUri(uriOrEntity, 'GET')
     const record = this.store.get(uri)
     if (!record) return
+    this.touch(uri)
     if (isLoaded(record)) {
       this.patchMeta(uri, { status: 'stale' })
     } else if (record.meta.status === 'error') {
@@ -275,6 +291,11 @@ export class HalcClient implements Client {
 
   purgeAll(): void {
     this.removeRecords(Object.keys(this.store.snapshot()))
+    // Responses of requests that are still running must not bring anything back.
+    this.purgedAt = ++this.epoch
+    this.touched.clear()
+    this.itemsCache.clear()
+    this.virtualWrappers.clear()
   }
 
   async href(
@@ -539,7 +560,7 @@ export class HalcClient implements Client {
         uri: tempUri,
         data: {},
         meta: {
-          version: 1,
+          version: this.nextVersion(),
           status: 'loaded',
           loadedAt: Date.now(),
           dirty: deepFreeze(JSON.parse(JSON.stringify(body)) as Record<string, unknown>),
@@ -566,6 +587,7 @@ export class HalcClient implements Client {
         if (tempUri) this.removeRecords([tempUri])
       }
     })
+    // Kept after the POST settled: a view may still hold the temporary item and patch it later.
     if (tempUri)
       this.pendingPosts.set(
         tempUri,
@@ -573,7 +595,6 @@ export class HalcClient implements Client {
       )
 
     const createdUri = await created
-    if (tempUri) this.pendingPosts.delete(tempUri)
     if (options.reload !== false && this.store.has(uri)) {
       void this.load(uri, false, true).catch(ignore)
     }
@@ -594,8 +615,7 @@ export class HalcClient implements Client {
     this.assertWritable(uri, 'patch')
     const record = this.store.get(uri)
     const loaded = isLoaded(record)
-    const current = loaded ? currentData(record as EntityRecord) : {}
-    const diff = diffForPatch(current, data, this.diffContext, options.force || !loaded)
+    const diff = this.diffPatch(record, data, options.force || !loaded)
     if (loaded && Object.keys(diff.body).length === 0) return this.wrapperFor(uri)
 
     const optimistic = (options.optimistic ?? this.options.optimistic ?? true) && loaded
@@ -684,6 +704,26 @@ export class HalcClient implements Client {
       )
     }
     return uri
+  }
+
+  /**
+   * What a PATCH sends: fields that differ from the confirmed data or from the current
+   * (optimistic) data. Comparing with both means a field is still sent when an earlier pending
+   * patch set the same value, since that patch may fail.
+   */
+  private diffPatch(
+    record: EntityRecord | undefined,
+    data: Record<string, unknown>,
+    force: boolean
+  ): PatchDiff {
+    const current = record ? currentData(record) : {}
+    const diff = diffForPatch(current, data, this.diffContext, force)
+    if (!record?.meta.dirty || force) return diff
+    const confirmed = diffForPatch(record.data, data, this.diffContext)
+    return {
+      body: { ...confirmed.body, ...diff.body },
+      dirty: { ...confirmed.dirty, ...diff.dirty },
+    }
   }
 
   private assertWritable(uri: string, operation: string): void {
@@ -802,7 +842,14 @@ export class HalcClient implements Client {
    */
   private load(uri: string, silent: boolean, force = false): Promise<void> {
     const existing = this.inflight.get(uri)
-    if (existing) return existing
+    // A forced load (a reload) must not join a request that started before the last write to
+    // this URI: that request's response is outdated and will be dropped by the write fence.
+    if (
+      existing &&
+      !(force && this.changedSince(uri, this.inflightSince.get(uri) ?? 0))
+    ) {
+      return existing
+    }
 
     const record = this.store.get(uri)
     if (!force && isLoaded(record) && record?.meta.status !== 'stale')
@@ -810,28 +857,45 @@ export class HalcClient implements Client {
     if (this.store.readOnly) return Promise.resolve()
 
     // A first load writes nothing until the response arrives (one store write per response);
-    // until then, the in-flight request is what marks the URI as loading.
-    if (record && !isLoaded(record) && record.meta.status !== 'loading') {
-      const patch: MetaPatch = { status: 'loading', error: undefined }
-      if (silent)
-        this.store.patchMeta(uri, { ...patch, version: record.meta.version + 1 })
-      else this.patchMeta(uri, patch)
+    // until then, the in-flight request is what marks the URI as loading. Reads (silent) never
+    // write, since they may run inside a reactive effect.
+    if (!silent && record && !isLoaded(record) && record.meta.status !== 'loading') {
+      this.patchMeta(uri, { status: 'loading', error: undefined })
     }
 
-    const promise = this.fetchAndStore(uri).finally(() => {
-      if (this.inflight.get(uri) === promise) this.inflight.delete(uri)
+    const startedAt = this.epoch
+    const promise = this.fetchAndStore(uri, startedAt).finally(() => {
+      if (this.inflight.get(uri) === promise) {
+        this.inflight.delete(uri)
+        this.inflightSince.delete(uri)
+      }
     })
     this.inflight.set(uri, promise)
+    this.inflightSince.set(uri, startedAt)
     promise.catch(ignore)
     return promise
   }
 
-  private async fetchAndStore(uri: string): Promise<void> {
+  /** Whether a write that must win over running requests happened to this URI after `epoch`. */
+  private changedSince(uri: string, epoch: number): boolean {
+    return Math.max(this.touched.get(uri) ?? 0, this.purgedAt) > epoch
+  }
+
+  private touch(uri: string): void {
+    this.touched.set(uri, ++this.epoch)
+  }
+
+  private nextVersion(previous = 0): number {
+    this.version = Math.max(this.version, previous) + 1
+    return this.version
+  }
+
+  private async fetchAndStore(uri: string, startedAt: number): Promise<void> {
     let response: HttpResponse
     try {
       response = await this.sendWithRetry(uri)
     } catch (error) {
-      this.recordLoadError(uri, error as ApiError)
+      if (!this.changedSince(uri, startedAt)) this.recordLoadError(uri, error as ApiError)
       throw error
     }
 
@@ -848,9 +912,13 @@ export class HalcClient implements Client {
         if (this.options.forceRequestedSelfLink) records[0] = { ...top, uri }
         else records.push({ ...top, uri, meta: { ...top.meta } })
       }
-      this.writeRecords(records)
+      // Records written by mutations, invalidated, deleted or purged since the request started
+      // are newer than this response.
+      this.writeRecords(
+        records.filter((record) => !this.changedSince(record.uri, startedAt))
+      )
     } catch (error) {
-      this.recordLoadError(uri, error as ApiError)
+      if (!this.changedSince(uri, startedAt)) this.recordLoadError(uri, error as ApiError)
       throw error
     }
   }
@@ -888,7 +956,7 @@ export class HalcClient implements Client {
           uri,
           data: {},
           meta: {
-            version: (record?.meta.version ?? 0) + 1,
+            version: this.nextVersion(record?.meta.version),
             status: 'error',
             error,
             ...(record?.meta.type === undefined
@@ -1000,6 +1068,7 @@ export class HalcClient implements Client {
       const body = parseJson(response.body)
       const identity = this.adapter.identity(body)
       if (method === 'POST' && identity === undefined) records.shift()
+      for (const record of records) this.touch(record.uri)
       this.writeRecords(records)
       if (method !== 'POST' || identity !== undefined) return top.uri
     }
@@ -1055,7 +1124,7 @@ export class HalcClient implements Client {
     for (const record of records) {
       const existing = this.store.get(record.uri)
       const meta = record.meta
-      meta.version = (existing?.meta.version ?? 0) + 1
+      meta.version = this.nextVersion(existing?.meta.version)
       meta.status = 'loaded'
       meta.loadedAt = now
       if (meta.type === undefined && existing?.meta.type !== undefined) {
@@ -1074,7 +1143,10 @@ export class HalcClient implements Client {
   private patchMeta(uri: string, patch: MetaPatch): void {
     const record = this.store.get(uri)
     if (!record) return
-    this.store.patchMeta(uri, { ...patch, version: record.meta.version + 1 })
+    this.store.patchMeta(uri, {
+      ...patch,
+      version: this.nextVersion(record.meta.version),
+    })
     this.afterWrite([uri])
   }
 
@@ -1088,11 +1160,22 @@ export class HalcClient implements Client {
     this.store.remove(uris)
     this.generation++
     for (const uri of uris) {
+      this.touch(uri)
       this.wrappers.delete(uri)
       this.placeholders.delete(uri)
       this.derivedMemos.delete(uri)
+      this.itemsCache.delete(uri)
+      this.itemsCache.delete(`${uri}\u0000all`)
       this.reactivity.bump(uri)
       this.reactivity.release?.(uri)
+    }
+    // Embedded collections of removed records.
+    const removed = new Set(uris)
+    for (const map of [this.itemsCache, this.virtualWrappers]) {
+      for (const key of map.keys()) {
+        const owner = key.split('#')[0] ?? ''
+        if (key.includes('#') && removed.has(owner)) map.delete(key)
+      }
     }
   }
 
@@ -1110,11 +1193,16 @@ export class HalcClient implements Client {
     const updated: EntityRecord = {
       uri,
       data: deepFreeze({ ...record.data, ...changes }),
-      meta: { ...record.meta, version: record.meta.version + 1, status: 'stale' },
+      meta: {
+        ...record.meta,
+        version: this.nextVersion(record.meta.version),
+        status: 'stale',
+      },
     }
     const dirty = this.queue.dirtyFor(updated)
     if (dirty) updated.meta.dirty = dirty
     else delete updated.meta.dirty
+    this.touch(uri)
     this.store.set([updated])
     this.afterWrite([uri])
   }
@@ -1134,11 +1222,12 @@ export class HalcClient implements Client {
     const updated: EntityRecord = {
       uri: collectionUri,
       data: deepFreeze({ ...record.data, items: { hrefs: [...hrefs, itemUri] } }),
-      meta: { ...record.meta, version: record.meta.version + 1 },
+      meta: { ...record.meta, version: this.nextVersion(record.meta.version) },
     }
     const dirty = this.queue.dirtyFor(updated)
     if (dirty) updated.meta.dirty = dirty
     else delete updated.meta.dirty
+    this.touch(collectionUri)
     this.store.set([updated])
     this.afterWrite([collectionUri])
   }
