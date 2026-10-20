@@ -489,21 +489,24 @@ export class HalcClient implements Client {
 
   async post(
     uriOrCollection: UriOrEntity,
-    data: Record<string, unknown>,
+    data?: Record<string, unknown>,
     options: PostOptions = {}
   ): Promise<Resource | null> {
     const uri = this.toUri(uriOrCollection, 'POST')
     this.assertWritable(uri, 'post')
-    const body = bodyForPost(data, this.diffContext)
+    // Without data, nothing is sent as body (e.g. for actions like refreshing a token).
+    const body = data === undefined ? undefined : bodyForPost(data, this.diffContext)
     const collection = this.store.get(uri)
     const optimistic =
+      body !== undefined &&
       (options.optimistic ?? this.options.optimistic ?? true) &&
       isLoaded(collection) &&
       isCollectionRecord(collection as EntityRecord)
 
     const id = this.queue.nextId()
     const tempUri = optimistic ? `${TEMP_URI_PREFIX}${id}` : undefined
-    const mutation: PendingMutation = { id, kind: 'post', uri, body, optimistic }
+    const mutation: PendingMutation = { id, kind: 'post', uri, optimistic }
+    if (body) mutation.body = body
     if (tempUri) mutation.tempUri = tempUri
     this.queue.add(mutation)
 

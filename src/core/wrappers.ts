@@ -132,7 +132,7 @@ class ResourceWrapper {
     return client.reload(uri)
   }
 
-  $post(data: Record<string, unknown>, options?: PostOptions): Promise<Resource | null> {
+  $post(data?: Record<string, unknown>, options?: PostOptions): Promise<Resource | null> {
     const { client, uri } = this[INTERNAL]
     return client.post(uri, data, options)
   }

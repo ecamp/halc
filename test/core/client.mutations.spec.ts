@@ -249,6 +249,16 @@ describe('post', () => {
     expect(created?.title).toBe('Nine')
   })
 
+  it('sends no body when posting without data', async () => {
+    const api = createApi()
+    api.mock.post('/api/token/refresh').reply(204)
+
+    await expect(api.post('/token/refresh')).resolves.toBeNull()
+
+    expect(api.mock.requests[0]?.body).toBeUndefined()
+    expect(api.mock.requests[0]?.headers['Content-Type']).toBeUndefined()
+  })
+
   it('resolves to null for 204 without Location', async () => {
     const api = createApi()
     api.mock.post('/api/auth/resend_activation').reply(204)

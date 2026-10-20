@@ -103,7 +103,7 @@ export interface PostOptions extends MutationOptions {
 export interface ResourceApi<Self = Resource, Props = Record<string, unknown>> {
   readonly _meta: ResourceMeta<Self>
   $reload(): Promise<Self>
-  $post(data: Record<string, unknown>, options?: PostOptions): Promise<Resource | null>
+  $post(data?: Record<string, unknown>, options?: PostOptions): Promise<Resource | null>
   $patch(data: Partial<Props>, options?: PatchOptions): Promise<Self>
   $del(options?: MutationOptions): Promise<void>
   /** URI of a relation, waiting for this resource to load if necessary. */
@@ -239,7 +239,7 @@ export interface Client {
   /** Creates a resource in a collection. Resolves to the created resource. */
   post(
     uriOrCollection: UriOrEntity,
-    data: Record<string, unknown>,
+    data?: Record<string, unknown>,
     options?: PostOptions
   ): Promise<Resource | null>
   /** Updates the given fields of a resource; sends only fields that changed. */
