@@ -40,6 +40,7 @@ TypeScript ([RFC](https://github.com/ecamp/ecamp3/issues/11062)):
 - [Modules](#modules)
 - [Testing](#testing)
 - [Migrating from hal-json-vuex](#migrating-from-hal-json-vuex)
+- [Known limitations](#known-limitations)
 - [Architecture](#architecture)
 - [Development](#development)
 
@@ -487,6 +488,17 @@ Axios is no longer used: pass headers through `headers` or `interceptors`. PATCH
 - The Vuex module holds records (`{ uri, data, meta }`) instead of v3's store data, and embedded lists
   are no longer stored under virtual keys (`api.get('/books/1#chapters')` still works).
 - The API root is always `''` (v3 sometimes stored it as `'/'`).
+
+## Known limitations
+
+These behave like in hal-json-vuex:
+
+- A wrapper reads current data, but its set of properties is fixed when it is created. If a later
+  response adds a property the record did not have (e.g. an API that omits `null` values), only
+  wrappers obtained afterwards (`api.get(uri)`, relation functions, `items`) have it.
+- Plain JSON objects that look exactly like a relation (`{ href }`, `{ href, templated: true }` or
+  `{ hrefs: [...] }`) are treated as one.
+- Query strings are re-encoded when their parameters are sorted, so `?flag` is requested as `?flag=`.
 
 ## Architecture
 
