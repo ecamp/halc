@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../../src/core/errors.js'
+import { MemoryStore } from '../../src/core/memoryStore.js'
 import { fixture, resetFixtureIds } from '../../src/testing/index.js'
 import { createApi, flush } from '../helpers.js'
 
@@ -28,6 +29,29 @@ describe('get', () => {
     // The placeholder forwards to the loaded resource from now on.
     expect(placeholder.title).toBe('Summer camp')
     expect(placeholder._meta.loading).toBe(false)
+  })
+
+  it('writes the store once per response, not when the request starts', async () => {
+    const store = new MemoryStore()
+    const set = vi.spyOn(store, 'set')
+    const patchMeta = vi.spyOn(store, 'patchMeta')
+    const api = createApi({ store })
+    const camp = fixture(
+      'Camp',
+      { creator: fixture('User', { name: 'x' }) },
+      { embed: true }
+    )
+    api.mock.get(camp).delay(5)
+
+    const placeholder = api.get(camp._meta.self)
+    expect(api.status(camp._meta.self)).toBe('loading')
+    expect(api.isUnknown(camp._meta.self)).toBe(false)
+    expect(set).not.toHaveBeenCalled()
+
+    await placeholder._meta.load
+    expect(set).toHaveBeenCalledTimes(1)
+    expect(set.mock.calls[0]?.[0]).toHaveLength(2)
+    expect(patchMeta).not.toHaveBeenCalled()
   })
 
   it('serves loaded resources from the store without requests', async () => {

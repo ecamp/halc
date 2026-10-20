@@ -129,14 +129,6 @@ export function currentValue(record: EntityRecord, key: string): unknown {
   return record.data[key]
 }
 
-/** Creates a record for a URI that is known, but not loaded. */
-export function placeholderRecord(
-  uri: string,
-  status: 'placeholder' | 'loading' = 'placeholder'
-): EntityRecord {
-  return { uri, data: {}, meta: { version: 0, status } }
-}
-
 export function isLoaded(record: EntityRecord | undefined): boolean {
   return record?.meta.loadedAt !== undefined
 }

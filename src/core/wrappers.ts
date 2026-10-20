@@ -514,7 +514,7 @@ class PlaceholderMeta implements ResourceMeta {
 
   get status(): RecordStatus | undefined {
     const { uri, client } = this.source
-    return uri === undefined ? undefined : client.store.get(uri)?.meta.status
+    return uri === undefined ? undefined : client.status(uri)
   }
 
   get type(): string | undefined {

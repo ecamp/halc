@@ -24,7 +24,6 @@ import {
   isLinkRef,
   isLoaded,
   isTemplatedLinkRef,
-  placeholderRecord,
   type EntityMeta,
   type EntityRecord,
   type MetaPatch,
@@ -225,11 +224,14 @@ export class HalcClient implements Client {
 
   isUnknown(uri: string): boolean {
     const normalized = this.normalizeUri(uri)
-    return !this.store.has(normalized.split('#')[0] ?? '')
+    const base = normalized.split('#')[0] ?? ''
+    return !this.store.has(base) && !this.inflight.has(base)
   }
 
   status(uri: string): RecordStatus | undefined {
-    return this.store.get(this.normalizeUri(uri))?.meta.status
+    const normalized = this.normalizeUri(uri)
+    const status = this.store.get(normalized)?.meta.status
+    return status ?? (this.inflight.has(normalized) ? 'loading' : undefined)
   }
 
   invalidate(uriOrEntity: UriOrEntity): void {
@@ -781,9 +783,9 @@ export class HalcClient implements Client {
       return Promise.resolve()
     if (this.store.readOnly) return Promise.resolve()
 
-    if (!record) {
-      this.store.set([placeholderRecord(uri, 'loading')])
-    } else if (!isLoaded(record) && record.meta.status !== 'loading') {
+    // A first load writes nothing until the response arrives (one store write per response);
+    // until then, the in-flight request is what marks the URI as loading.
+    if (record && !isLoaded(record) && record.meta.status !== 'loading') {
       const patch: MetaPatch = { status: 'loading', error: undefined }
       if (silent)
         this.store.patchMeta(uri, { ...patch, version: record.meta.version + 1 })
@@ -853,18 +855,17 @@ export class HalcClient implements Client {
 
   private recordLoadError(uri: string, error: ApiError): void {
     const record = this.store.get(uri)
-    if (!record) return
     const gone = error.status === 404 || error.status === 410
-    if (gone || !isLoaded(record)) {
+    if (!record || gone || !isLoaded(record)) {
       this.store.set([
         {
           uri,
           data: {},
           meta: {
-            version: record.meta.version + 1,
+            version: (record?.meta.version ?? 0) + 1,
             status: 'error',
             error,
-            ...(record.meta.type === undefined
+            ...(record?.meta.type === undefined
               ? this.typeMeta(uri)
               : { type: record.meta.type }),
           },
