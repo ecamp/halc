@@ -50,3 +50,15 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run check:package
+
+  benchmark:
+    name: Performance budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run bench

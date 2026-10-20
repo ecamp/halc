@@ -4,13 +4,13 @@ export default defineConfig({
   test: {
     include: ['test/**/*.spec.ts'],
     environment: 'node',
+    benchmark: {
+      include: ['bench/**/*.bench.ts'],
+    },
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
       reporter: ['text', 'lcov'],
-    },
-    benchmark: {
-      include: ['bench/**/*.bench.ts'],
     },
   },
 })

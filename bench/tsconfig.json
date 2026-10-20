@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // The benchmarks import the built package (to measure what users get, without Vitest's
+    // module transform); for type checking, the imports point at the sources.
+    "paths": {
+      "halc": ["../src/index.ts"],
+      "halc/*": ["../src/*/index.ts"]
+    },
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["."]
+}
