@@ -21,7 +21,7 @@ describe('createFetchTransport', () => {
 
     expect(fetch).toHaveBeenCalledWith('http://localhost/api/camps', {
       method: 'POST',
-      headers: { Accept: 'application/hal+json' },
+      headers: { 'User-Agent': 'halc/development', Accept: 'application/hal+json' },
       body: '{}',
       credentials: 'include',
     })
@@ -44,5 +44,24 @@ describe('createFetchTransport', () => {
       body: 'nope',
     })
     await expect(transport.request(request)).rejects.toThrow('Failed to fetch')
+  })
+
+  it('identifies itself in Node, unless a user agent is given', async () => {
+    const fetch = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) => new Response('')
+    )
+    const transport = createFetchTransport({ fetch })
+
+    await transport.request({ method: 'GET', url: 'http://localhost/', headers: {} })
+    await transport.request({
+      method: 'GET',
+      url: 'http://localhost/',
+      headers: { 'user-agent': 'mine' },
+    })
+
+    expect(fetch.mock.calls.map(([, init]) => init?.headers)).toEqual([
+      { 'User-Agent': 'halc/development' },
+      { 'user-agent': 'mine' },
+    ])
   })
 })

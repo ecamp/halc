@@ -1,5 +1,6 @@
 export { createHalc, HalcClient } from './client.js'
 export { ApiError, type ApiErrorDetails } from './errors.js'
+export { VERSION } from './version.js'
 export { MemoryStore } from './memoryStore.js'
 export { noopReactivity } from './noopReactivity.js'
 export { createFetchTransport, type FetchTransportOptions } from './transport.js'
