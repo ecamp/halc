@@ -42,8 +42,9 @@ npm run check:package       # publint + are-the-types-wrong; run after build
 ## Conventions
 
 - **Small, reviewable commits:** one concern per commit, each passing lint, typecheck and tests.
-  The subject follows Conventional Commits. The body states the why briefly and objectively, only
-  when it isn't obvious, with no figures of speech.
+  The subject follows Conventional Commits. The message is never longer than the subject line plus
+  3 lines of body: objective facts in short form, the why only when it isn't obvious, no figures
+  of speech.
 - **Where documentation goes**, in this order:
   1. Make the code speak for itself: split and name methods, variables and tests so they are
      self-explanatory.
