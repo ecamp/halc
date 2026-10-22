@@ -43,7 +43,8 @@ checking, and `npm run bench` builds first.
 To try unreleased changes in an app (e.g. ecamp3 in Docker):
 
 1. Pack the package into a directory the app's containers can see:
-   `npm pack --pack-destination <app>/common/vendor`.
+   `npm pack --pack-destination <app>/common/packages` (not a `vendor` directory: ecamp3's
+   `.dockerignore` excludes those from image builds).
 2. Reference the tarball with a `file:` dependency, then run `npm install <tarball>` in the
    container. The version doesn't change, so a plain `npm install` may keep the old contents.
 3. Restart the Vite dev server. Otherwise it serves its old pre-bundled dependencies and the page
