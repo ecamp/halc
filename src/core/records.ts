@@ -132,3 +132,20 @@ export function currentValue(record: EntityRecord, key: string): unknown {
 export function isLoaded(record: EntityRecord | undefined): boolean {
   return record?.meta.loadedAt !== undefined
 }
+
+/**
+ * A mutable deep copy of the current data of a record: relations become URIs (lists of URIs for
+ * to-many relations), templated links are left out.
+ */
+export function plainData(record: EntityRecord): Record<string, unknown> {
+  const data: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(currentData(record))) {
+    if (isTemplatedLinkRef(value)) continue
+    if (isLinkRef(value)) data[key] = value.href
+    else if (isCollectionRef(value)) data[key] = [...value.hrefs]
+    else
+      data[key] =
+        typeof value === 'object' && value !== null ? structuredClone(value) : value
+  }
+  return data
+}

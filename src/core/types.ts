@@ -118,7 +118,11 @@ export interface PostOptions extends MutationOptions {
   reload?: boolean
 }
 
-export interface ResourceApi<Self = Resource, Props = Record<string, unknown>> {
+export interface ResourceApi<
+  Self = Resource,
+  Props = Record<string, unknown>,
+  Data = Record<string, unknown>,
+> {
   readonly _meta: ResourceMeta<Self>
   $reload(): Promise<Self>
   $post(data?: Record<string, unknown>, options?: PostOptions): Promise<Resource | null>
@@ -138,6 +142,12 @@ export interface ResourceApi<Self = Resource, Props = Record<string, unknown>> {
   $rel(relation: string, params?: TemplateParams): Resource
   /** Casts this wrapper to the wrapper type of a type name. Does nothing at runtime. */
   as<K extends TypeName>(): Of<K>
+  /**
+   * A mutable deep copy of the current data, e.g. as model of a form: relations are URIs (lists
+   * of URIs for to-many relations), without `_meta`, relation functions and derived fields.
+   * Throws if the resource is not loaded.
+   */
+  $toData(): Data
   toJSON(): Record<string, unknown>
 }
 
@@ -176,7 +186,14 @@ type RelationFunctions<R> = {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export type Entity<P, R = {}> = Readonly<P> &
   RelationFunctions<R> &
-  ResourceApi<Entity<P, R>, P & RelationValues<R>>
+  ResourceApi<Entity<P, R>, P & RelationValues<R>, P & RelationData<R>>
+
+/** Relations in `$toData()`: URIs, lists of URIs for embedded to-many relations. */
+type RelationData<R> = {
+  -readonly [
+    K in keyof R as R[K] extends Templated<unknown, unknown> ? never : K
+  ]: R[K] extends string ? string | null : string | string[]
+}
 
 /** What can be patched into relations: URIs or wrappers (lists of them for to-many). */
 type RelationValues<R> = {

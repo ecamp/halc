@@ -25,6 +25,7 @@ import {
   isLinkRef,
   isLoaded,
   isTemplatedLinkRef,
+  plainData,
   type EntityMeta,
   type EntityRecord,
   type MetaPatch,
@@ -402,6 +403,16 @@ export class HalcClient implements Client {
       )
     }
     return Promise.resolve(this.wrapperFor(uri))
+  }
+
+  /** @internal */
+  toData(uri: string): Record<string, unknown> {
+    this.reactivity.track(uri)
+    const record = this.store.get(uri)
+    if (!record || !isLoaded(record)) {
+      throw new Error(`Cannot copy the data of "${uri}" before it is loaded`)
+    }
+    return plainData(record)
   }
 
   /** @internal Calls a relation function of a resource by name. */

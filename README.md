@@ -148,11 +148,15 @@ book.$href('author') // Promise<string | undefined>, waits for the book to load
 book.$hrefSync('author') // string | undefined, never sends a request
 book.$hrefs('chapters') // Promise<string[]>: every URI of a to-many relation
 book.$hrefsSync('chapters') // string[] | undefined
+book.$toData() // a mutable copy of the data, relations as URIs (see below)
 ```
 
 Wrappers are plain objects: spreading (which keeps `_meta` and the relation functions) and
 `JSON.stringify` work, and Vue never makes them reactive
 (they are marked raw). Their data is **frozen**: change data with `$patch`, not by mutating objects.
+For a form, take a mutable copy with `$toData()`: a deep copy of the data with relations as URIs
+(lists of URIs for embedded to-many relations), without `_meta`, relation functions and derived
+fields, ready to edit and to send back with `$patch` (which sends only what changed).
 A wrapper always reads the current data of its record, but `api.get(uri)` returns a new wrapper after
 every change. Read resources in templates, computed properties and watchers rather than storing
 wrappers in `data()`.
@@ -482,7 +486,7 @@ Axios is no longer used: pass headers through `headers` or `interceptors`. PATCH
   relation turns out not to exist.
 - Mutations are optimistic and `$patch` sends only changed fields. Opt out with `optimistic: false`
   or `force: true` where that matters.
-- Data read from wrappers is frozen: mutating it throws.
+- Data read from wrappers is frozen: mutating it throws. Use `$toData()` for a mutable copy.
 - After a failed GET, the resource is not requested again until it is reloaded (sticky errors), and
   entities deleted by a cascade end up in that state instead of being removed from the store.
 - POST reloads the target collection afterwards.

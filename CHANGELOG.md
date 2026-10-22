@@ -19,6 +19,7 @@ First release of halc, the successor of hal-json-vuex 3 and hal-json-normalizer 
 - Optimistic `$post`/`$patch`/`$del` with rollback; `$patch` sends only changed fields.
 - Sticky load errors, request de-duplication and retries with backoff for GET requests.
 - `ApiError` with method, URI, status, type, body excerpt and parsed body.
+- `$toData()`: a mutable copy of an entity's data with relations as URIs, e.g. as form model.
 - `$hrefs`, `$hrefSync`, `$hrefsSync`, `$rel`, `_meta.links`, `_meta.error`, `api.status()`,
   `api.invalidate()`.
 - Preprocessors for derived fields per entity type.

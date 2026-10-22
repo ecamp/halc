@@ -218,3 +218,85 @@ describe('virtual collections', () => {
     expect(loaded.items[0]!.a).toBe(1)
   })
 })
+
+describe('$toData', () => {
+  async function loadedBook(api = createApi()) {
+    api.mock.get('/api/books/1').reply(200, {
+      _links: {
+        self: { href: '/api/books/1' },
+        author: { href: '/api/authors/1' },
+        reviews: { href: '/api/reviews{?rating}', templated: true },
+      },
+      _embedded: {
+        chapters: [{ _links: { self: { href: '/api/chapters/1' } }, title: 'c' }],
+      },
+      title: 'The Hobbit',
+      meta: { tags: ['fantasy'] },
+      editor: null,
+    })
+    return { api, book: await api.get('/books/1')._meta.load }
+  }
+
+  it('copies the data with relations as URIs, without links that are templates', async () => {
+    const { book } = await loadedBook()
+
+    expect(book.$toData()).toEqual({
+      title: 'The Hobbit',
+      meta: { tags: ['fantasy'] },
+      editor: null,
+      author: '/authors/1',
+      chapters: ['/chapters/1'],
+    })
+  })
+
+  it('returns a mutable copy that is independent of the store', async () => {
+    const { api, book } = await loadedBook()
+
+    const data = book.$toData()
+    data.title = 'Changed'
+    ;(data.meta as { tags: string[] }).tags.push('classic')
+
+    expect(api.get('/books/1').title).toBe('The Hobbit')
+    expect(api.get('/books/1').meta).toEqual({ tags: ['fantasy'] })
+  })
+
+  it('can be patched back without sending anything', async () => {
+    const { api, book } = await loadedBook()
+
+    await book.$patch(book.$toData())
+
+    expect(api.mock.requests).toHaveLength(1)
+  })
+
+  it('contains optimistic changes, not derived fields', async () => {
+    const { api } = await loadedBook(
+      createApi({ preprocessors: { Book: (book) => ({ shout: String(book.title) }) } })
+    )
+    api.mock.patch('/api/books/1').delay(5)
+
+    const patch = api.get('/books/1').$patch({ title: 'New' })
+    expect(api.get('/books/1').$toData()).toMatchObject({ title: 'New' })
+    expect(api.get('/books/1').$toData()).not.toHaveProperty('shout')
+    await patch
+  })
+
+  it('throws for resources that are not loaded, and works once they are', async () => {
+    const api = createApi()
+    api.mock
+      .get('/api/books/1')
+      .delay(5)
+      .reply(200, { _links: { self: { href: '/api/books/1' } }, a: 1 })
+
+    const placeholder = api.get('/books/1')
+    expect(() => placeholder.$toData()).toThrow(
+      'Cannot copy the data of a resource before it is loaded'
+    )
+    await placeholder._meta.load
+    expect(placeholder.$toData()).toEqual({ a: 1 })
+  })
+
+  it('copies the URIs of the items of an embedded collection', async () => {
+    const { book } = await loadedBook()
+    expect(book.chapters().$toData()).toEqual({ items: ['/chapters/1'] })
+  })
+})

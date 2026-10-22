@@ -14,7 +14,8 @@ Behaviour consumers rely on, which is easy to break unknowingly:
 - Placeholders: unknown properties are callable and render as `''`, `items` is `[]`,
   `_meta.loading` is `true` and `_meta.self` is the URI if known. `api.get(placeholder)` returns the
   placeholder.
-- Entities are read-only. Forms copy them before using them as a model.
+- Entities are read-only. Forms use `$toData()` (a mutable copy with relations as URIs) as their
+  model.
 - `ApiError.response` mirrors an axios response (`status`, `data`, `headers` with lower-case
   names) for error handling written for axios.
 - `api.post(uri)` without data is valid, as an action without body.

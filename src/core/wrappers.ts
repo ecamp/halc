@@ -172,6 +172,11 @@ class ResourceWrapper {
     return this
   }
 
+  $toData(): Record<string, unknown> {
+    const { client, uri } = this[INTERNAL]
+    return client.toData(uri)
+  }
+
   toJSON(): Record<string, unknown> {
     const { client, uri } = this[INTERNAL]
     client.reactivity.track(uri)
@@ -478,6 +483,10 @@ class VirtualCollectionWrapper {
     return this
   }
 
+  $toData(): Record<string, unknown> {
+    return { items: [...(this._meta as VirtualMetaView).hrefs] }
+  }
+
   toJSON(): Record<string, unknown> {
     return {
       items: (this._meta as VirtualMetaView).hrefs,
@@ -629,6 +638,10 @@ function createPlaceholder(source: PlaceholderSource): Resource {
             createDeferred(proxy, relation, params)
         case 'as':
           return () => proxy
+        case '$toData':
+          return () => {
+            throw new Error('Cannot copy the data of a resource before it is loaded')
+          }
         case 'toJSON':
           return () => ({})
         case 'toString':

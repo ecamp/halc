@@ -88,3 +88,14 @@ export async function derivedFieldsAfterLoading() {
   // @ts-expect-error -- not a property or relation of TypedCamp
   await loaded.$patch({ unknown: 1 })
 }
+
+// $toData() is mutable plain data: properties, relations as URIs, no templated links.
+export function plainDataOfEntities() {
+  const data = api.get<'TypedCamp'>('/camps/1').$toData()
+  data.title = 'changed'
+  expectTypeOf(data.title).toEqualTypeOf<string>()
+  expectTypeOf(data.creator).toEqualTypeOf<string | null>()
+  expectTypeOf(data.activities).toEqualTypeOf<string | string[]>()
+  expectTypeOf(data).not.toHaveProperty('collaborations')
+  expectTypeOf(data).not.toHaveProperty('_meta')
+}
