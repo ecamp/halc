@@ -22,7 +22,7 @@
     "type": "git",
     "url": "git+https://github.com/ecamp/halc.git"
   },
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "contributors": [
     "Carlo Beltrame",
     "Urban Suppiger",
