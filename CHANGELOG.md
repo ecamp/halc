@@ -6,6 +6,8 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-24
+
 First release of halc, the successor of hal-json-vuex 3 and hal-json-normalizer 5
 ([RFC](https://github.com/ecamp/ecamp3/issues/11062)). See the README for the migration guide.
 
