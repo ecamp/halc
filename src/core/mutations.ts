@@ -19,6 +19,8 @@ export interface PendingMutation {
   optimistic: boolean
   /** For PATCH: the local changes in record form (relations as refs). */
   dirty?: Record<string, unknown>
+  /** For PATCH: the local merge-patch delta in record form, used to recompute `dirty`. */
+  patch?: Record<string, unknown>
   /** For POST: the URI of the temporary record. */
   tempUri?: string
 }
@@ -80,7 +82,14 @@ export class MutationQueue {
     for (const mutation of this.mutations) {
       if (mutation.uri !== record.uri || !mutation.optimistic) continue
       if (mutation.kind === 'patch' && mutation.dirty) {
-        dirty = { ...dirty, ...mutation.dirty }
+        if (mutation.patch) {
+          dirty = {
+            ...dirty,
+            ...applyRecordPatch({ ...record.data, ...dirty }, mutation.patch),
+          }
+        } else {
+          dirty = { ...dirty, ...mutation.dirty }
+        }
       } else if (mutation.kind === 'post' && mutation.tempUri) {
         const base = (dirty?.items ?? record.data.items) as CollectionRef | undefined
         const hrefs = isCollectionRef(base) ? base.hrefs : []
@@ -126,6 +135,32 @@ function toHref(value: unknown, context: DiffContext): string | null | undefined
  * other objects compare the way they will be sent).
  */
 function toRecordValue(current: unknown, value: unknown, context: DiffContext): unknown {
+  return applyRecordPatchValue(current, toRecordPatchValue(current, value, context))
+}
+
+function applyRecordPatchValue(current: unknown, patch: unknown): unknown {
+  return isRelationRef(current) || isRelationRef(patch)
+    ? patch
+    : mergePatch(current, patch)
+}
+
+/** Applies a record-form merge patch, returning only the patched fields. */
+export function applyRecordPatch(
+  current: Record<string, unknown>,
+  patch: Record<string, unknown>
+): Record<string, unknown> {
+  const changes: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(patch)) {
+    changes[key] = applyRecordPatchValue(current[key], value)
+  }
+  return changes
+}
+
+function toRecordPatchValue(
+  current: unknown,
+  value: unknown,
+  context: DiffContext
+): unknown {
   if (isLinkRef(current) || current === null) {
     const href = toHref(value, context)
     if (href === null) return null
@@ -136,12 +171,7 @@ function toRecordValue(current: unknown, value: unknown, context: DiffContext): 
     if (hrefs.every((href) => typeof href === 'string')) return { hrefs }
   }
   if (value === undefined) return undefined
-  const json = JSON.parse(JSON.stringify(value)) as unknown
-  // A PATCH is a JSON merge patch (RFC 7386): an object updates the current object field by
-  // field (null removes a field), so the optimistic value keeps the fields it doesn't mention.
-  return isJsonObject(current) && isJsonObject(json) && !isRelationRef(current)
-    ? mergePatch(current, json)
-    : json
+  return JSON.parse(JSON.stringify(value)) as unknown
 }
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
@@ -164,6 +194,22 @@ export interface PatchDiff {
   body: Record<string, unknown>
   /** The same fields in record form, for the optimistic update. */
   dirty: Record<string, unknown>
+}
+
+/** Converts selected PATCH fields into a merge-patch delta in record form. */
+export function recordPatchFor(
+  current: Record<string, unknown>,
+  data: Record<string, unknown>,
+  keys: Iterable<string>,
+  context: DiffContext
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {}
+  for (const key of keys) {
+    const value = data[key]
+    if (key === '_meta' || typeof value === 'function' || value === undefined) continue
+    patch[key] = toRecordPatchValue(current[key], value, context)
+  }
+  return patch
 }
 
 /**
