@@ -131,6 +131,200 @@ describe('patch', () => {
     expect(api.get(camp._meta.self)._meta.dirty).toBeUndefined()
   })
 
+  it.each([200, 204])(
+    'rolls back a failed nested change before a %i response',
+    async (status) => {
+      const { api, camp, wrapper } = await loadedCamp(undefined, {
+        settings: { left: 'old', right: 'old' },
+      })
+      api.mock.patch(camp).reply(422).once()
+      api.mock
+        .patch(camp)
+        .delay(10)
+        .reply(
+          status,
+          status === 200
+            ? { ...camp, settings: { left: 'old', right: 'pending' } }
+            : undefined
+        )
+      api.mock
+        .get(camp)
+        .delay(10)
+        .reply(200, {
+          ...camp,
+          settings: { left: 'old', right: 'pending' },
+        })
+
+      const first = wrapper.$patch({ settings: { left: 'failed' } })
+      const second = wrapper.$patch({ settings: { right: 'pending' } })
+      expect(api.get(camp._meta.self).settings).toEqual({
+        left: 'failed',
+        right: 'pending',
+      })
+
+      await expect(first).rejects.toThrow('status 422')
+      expect(api.get(camp._meta.self).settings).toEqual({
+        left: 'old',
+        right: 'pending',
+      })
+      await second
+      expect(wrapper.settings).toEqual({ left: 'old', right: 'pending' })
+      expect(wrapper._meta.dirty).toBeUndefined()
+      await wrapper._meta.load
+      expect(wrapper.settings).toEqual({ left: 'old', right: 'pending' })
+      expect(
+        api.mock.requests
+          .filter((request) => request.method === 'PATCH')
+          .map((request) => request.body)
+      ).toEqual([{ settings: { left: 'failed' } }, { settings: { right: 'pending' } }])
+    }
+  )
+
+  it.each([true, false])(
+    'keeps confirmed server changes on 204 with optimistic=%s',
+    async (optimistic) => {
+      const { api, camp, wrapper } = await loadedCamp(undefined, {
+        settings: { left: 'old', right: 'old' },
+      })
+      api.mock
+        .patch(camp)
+        .once()
+        .reply(200, {
+          ...camp,
+          settings: { left: 'server', right: 'old' },
+        })
+      api.mock.patch(camp).delay(10).reply(204)
+      api.mock
+        .get(camp)
+        .delay(10)
+        .reply(200, {
+          ...camp,
+          settings: { left: 'server', right: 'pending' },
+        })
+
+      const first = wrapper.$patch({ settings: { left: 'first' } })
+      const second = wrapper.$patch({ settings: { right: 'pending' } }, { optimistic })
+      await first
+      expect(wrapper.settings).toEqual({
+        left: 'server',
+        right: optimistic ? 'pending' : 'old',
+      })
+      expect(() => {
+        wrapper.settings.right = 'bypass'
+      }).toThrow(TypeError)
+      await second
+      expect(wrapper.settings).toEqual({ left: 'server', right: 'pending' })
+      expect(wrapper._meta.dirty).toBeUndefined()
+      await wrapper._meta.load
+    }
+  )
+
+  it('keeps a later relation callable when an earlier patch clears it and fails', async () => {
+    const author = fixture('Author', { name: 'old' })
+    const nextAuthor = fixture('Author', { name: 'new' })
+    const book = fixture('Book', { author })
+    const api = createApi()
+    api.mock.get(book)
+    api.mock.get(nextAuthor)
+    const wrapper = await api.get(book._meta.self)._meta.load
+    const replacement = await api.get(nextAuthor._meta.self)._meta.load
+    api.mock.patch(book).once().reply(422)
+    api.mock.patch(book).reply(204)
+    api.mock
+      .get(book)
+      .delay(10)
+      .reply(200, {
+        ...book,
+        _links: { ...book._links, author: { href: nextAuthor._meta.self } },
+      })
+
+    const first = wrapper.$patch({ author: null })
+    const second = wrapper.$patch({ author: replacement })
+    expect(wrapper.author()._meta.self).toBe(replacement._meta.self)
+    await expect(first).rejects.toThrow('status 422')
+    expect(wrapper.author()._meta.self).toBe(replacement._meta.self)
+    await second
+    expect(wrapper.author()._meta.self).toBe(replacement._meta.self)
+    await wrapper._meta.load
+  })
+
+  it.each([
+    [200, 'wrapper'],
+    [200, 'uri'],
+    [204, 'wrapper'],
+    [204, 'uri'],
+  ] as const)(
+    'preserves an optimistic relation after a server clear with a %i response and %s input',
+    async (status, input) => {
+      const author = fixture('Author', { name: 'original' })
+      const nextAuthor = fixture('Author', { name: 'pending' })
+      const lastAuthor = fixture('Author', { name: 'last' })
+      const book = fixture('Book', { title: 'old', author })
+      const api = createApi()
+      api.mock.get(book)
+      api.mock.get(nextAuthor)
+      api.mock.get(lastAuthor)
+      const wrapper = await api.get(book._meta.self)._meta.load
+      const next = await api.get(nextAuthor._meta.self)._meta.load
+      const last = await api.get(lastAuthor._meta.self)._meta.load
+      api.mock
+        .patch(book)
+        .once()
+        .reply(200, {
+          title: 'new',
+          author: null,
+          _links: { self: { href: book._meta.self } },
+        })
+      api.mock
+        .patch(book)
+        .once()
+        .delay(10)
+        .reply(200, {
+          title: 'new',
+          _links: {
+            self: { href: book._meta.self },
+            author: { href: nextAuthor._meta.self },
+          },
+        })
+      const confirmed = {
+        title: 'new',
+        _links: {
+          self: { href: book._meta.self },
+          author: { href: lastAuthor._meta.self },
+        },
+      }
+      api.mock.patch(book).reply(status, status === 200 ? confirmed : undefined)
+      api.mock.get(book).delay(10).reply(200, confirmed)
+
+      const first = wrapper.$patch({ title: 'new' })
+      const second = wrapper.$patch({ author: next })
+      await first
+      expect(wrapper.author()._meta.self).toBe(next._meta.self)
+
+      const third = wrapper.$patch({
+        author: input === 'wrapper' ? last : lastAuthor._meta.self,
+      })
+      expect(wrapper.author()._meta.self).toBe(last._meta.self)
+      expect(wrapper.$hrefSync('author')).toBe(last._meta.self)
+      await second
+      expect(wrapper.author()._meta.self).toBe(last._meta.self)
+      await third
+      expect(wrapper.author()._meta.self).toBe(last._meta.self)
+      expect(wrapper.$toData().author).toBe(last._meta.self)
+      expect(wrapper._meta.dirty).toBeUndefined()
+      await wrapper._meta.load
+      expect(
+        api.mock.requests
+          .filter((request) => request.method === 'PATCH')
+          .map((request) => request.body)
+      ).toEqual([
+        { title: 'new' },
+        { author: nextAuthor._meta.self },
+        { author: lastAuthor._meta.self },
+      ])
+    }
+  )
+
   it('without optimistic, waits for the API before changing anything', async () => {
     const { api, camp, wrapper } = await loadedCamp(createApi({ optimistic: false }))
     api.mock.patch(camp).delay(5)

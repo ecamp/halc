@@ -10,9 +10,11 @@ import type {
 import { ApiError } from './errors.js'
 import { MemoryStore } from './memoryStore.js'
 import {
+  applyRecordPatch,
   bodyForPost,
   diffForPatch,
   MutationQueue,
+  recordPatchFor,
   type DiffContext,
   type PatchDiff,
 } from './mutations.js'
@@ -634,12 +636,20 @@ export class HalcClient implements Client {
     if (loaded && Object.keys(diff.body).length === 0) return this.wrapperFor(uri)
 
     const optimistic = (options.optimistic ?? this.options.optimistic ?? true) && loaded
+    const patch = recordPatchFor(
+      record ? currentData(record) : {},
+      data,
+      Object.keys(diff.body),
+      this.diffContext,
+      record?.data
+    )
     const mutation: PendingMutation = {
       id: this.queue.nextId(),
       kind: 'patch',
       uri,
       body: diff.body,
       dirty: diff.dirty,
+      patch,
       optimistic,
     }
     this.queue.add(mutation)
@@ -660,7 +670,7 @@ export class HalcClient implements Client {
       const storedUri = await this.storeMutationResponse(uri, response, 'PATCH')
       if (storedUri === undefined) {
         // No content: keep the change and fetch what the server made of it.
-        this.commitData(uri, diff.dirty)
+        this.commitData(uri, patch)
         void this.load(uri, false, true).catch(ignore)
       }
       return this.wrapperFor(uri)
@@ -1192,7 +1202,7 @@ export class HalcClient implements Client {
       if (existing?.meta.deleting) meta.deleting = true
       deepFreeze(record.data)
       const dirty = this.queue.dirtyFor(record)
-      if (dirty) meta.dirty = dirty
+      if (dirty) meta.dirty = deepFreeze(dirty)
       uris.push(record.uri)
     }
     this.store.set(records)
@@ -1246,12 +1256,12 @@ export class HalcClient implements Client {
   }
 
   /** Writes confirmed changes into the data of a record (for answers without content). */
-  private commitData(uri: string, changes: Record<string, unknown>): void {
+  private commitData(uri: string, patch: Record<string, unknown>): void {
     const record = this.store.get(uri)
     if (!record) return
     const updated: EntityRecord = {
       uri,
-      data: deepFreeze({ ...record.data, ...changes }),
+      data: deepFreeze({ ...record.data, ...applyRecordPatch(record.data, patch) }),
       meta: {
         ...record.meta,
         version: this.nextVersion(record.meta.version),
@@ -1259,7 +1269,7 @@ export class HalcClient implements Client {
       },
     }
     const dirty = this.queue.dirtyFor(updated)
-    if (dirty) updated.meta.dirty = dirty
+    if (dirty) updated.meta.dirty = deepFreeze(dirty)
     else delete updated.meta.dirty
     this.touch(uri)
     this.store.set([updated])
@@ -1284,7 +1294,7 @@ export class HalcClient implements Client {
       meta: { ...record.meta, version: this.nextVersion(record.meta.version) },
     }
     const dirty = this.queue.dirtyFor(updated)
-    if (dirty) updated.meta.dirty = dirty
+    if (dirty) updated.meta.dirty = deepFreeze(dirty)
     else delete updated.meta.dirty
     this.touch(collectionUri)
     this.store.set([updated])

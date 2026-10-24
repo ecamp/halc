@@ -4,6 +4,7 @@ import {
   diffForPatch,
   mergePatch,
   MutationQueue,
+  recordPatchFor,
 } from '../../src/core/mutations.js'
 import type { EntityRecord } from '../../src/core/records.js'
 import { createUriNormalizer } from '../../src/core/uri.js'
@@ -100,6 +101,38 @@ describe('bodyForPost', () => {
   })
 })
 
+describe('recordPatchFor', () => {
+  it.each(['visible', 'confirmed'])(
+    'normalizes to-one and to-many relations from the %s state',
+    (source) => {
+      const references = {
+        author: { href: '/authors/1' },
+        chapters: { hrefs: ['/chapters/1'] },
+      }
+      const cleared = { author: null, chapters: null }
+      const data = {
+        author: wrapper('/authors/2'),
+        chapters: [wrapper('/chapters/2')],
+        title: '/somewhere',
+      }
+
+      expect(
+        recordPatchFor(
+          source === 'visible' ? references : cleared,
+          data,
+          Object.keys(data),
+          context,
+          source === 'confirmed' ? references : cleared
+        )
+      ).toEqual({
+        author: { href: '/authors/2' },
+        chapters: { hrefs: ['/chapters/2'] },
+        title: '/somewhere',
+      })
+    }
+  )
+})
+
 describe('MutationQueue', () => {
   const record: EntityRecord = {
     uri: '/activities',
@@ -170,6 +203,60 @@ describe('MutationQueue', () => {
     expect(log).toEqual(['b1', 'a1', 'a2'])
     await queue.settled('/a')
   })
+
+  it('reapplies remaining deltas after rollback, merging objects and replacing arrays and relations', () => {
+    const book: EntityRecord = {
+      uri: '/books/1',
+      data: {
+        settings: { left: 'old', nested: { kept: 1, removed: 2 } },
+        tags: ['old'],
+        author: { href: '/authors/1' },
+        chapters: { hrefs: ['/chapters/1'] },
+      },
+      meta: { version: 1, status: 'loaded' },
+    }
+    const queue = new MutationQueue()
+    const first = {
+      id: '1',
+      kind: 'patch' as const,
+      uri: book.uri,
+      optimistic: true,
+      dirty: { settings: null },
+      patch: { settings: null },
+    }
+    const second = {
+      id: '2',
+      kind: 'patch' as const,
+      uri: book.uri,
+      optimistic: true,
+      dirty: { settings: { nested: { next: 3 } } },
+      patch: {
+        settings: { nested: { removed: null, next: 3 } },
+        tags: ['new'],
+        author: { href: '/authors/2' },
+        chapters: { hrefs: ['/chapters/2'] },
+      },
+    }
+    queue.add(first)
+    queue.add(second)
+    expect(queue.dirtyFor(book)).toEqual({
+      settings: { nested: { next: 3 } },
+      tags: ['new'],
+      author: { href: '/authors/2' },
+      chapters: { hrefs: ['/chapters/2'] },
+    })
+
+    queue.remove(first)
+    expect(queue.dirtyFor(book)).toEqual({
+      settings: { left: 'old', nested: { kept: 1, next: 3 } },
+      tags: ['new'],
+      author: { href: '/authors/2' },
+      chapters: { hrefs: ['/chapters/2'] },
+    })
+    queue.remove(second)
+    expect(queue.dirtyFor(book)).toBeUndefined()
+    expect(book.data.settings).toEqual({ left: 'old', nested: { kept: 1, removed: 2 } })
+  })
 })
 
 describe('util', () => {
@@ -210,6 +297,21 @@ describe('diffForPatch with nested objects', () => {
       diffForPatch(current, { data: { sections: { a: { column1: 'A1' } } } }, context)
         .body
     ).toEqual({})
+  })
+
+  it.each([
+    { value: null },
+    { value: 1 },
+    { value: 'old' },
+    { value: ['old'] },
+    { value: undefined },
+  ])('applies object patches to $value using an empty object', ({ value }) => {
+    expect(
+      diffForPatch({ data: value }, { data: { removed: null, kept: 'new' } }, context)
+    ).toEqual({
+      body: { data: { removed: null, kept: 'new' } },
+      dirty: { data: { kept: 'new' } },
+    })
   })
 
   it('replaces arrays and primitives', () => {
