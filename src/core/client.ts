@@ -637,10 +637,11 @@ export class HalcClient implements Client {
 
     const optimistic = (options.optimistic ?? this.options.optimistic ?? true) && loaded
     const patch = recordPatchFor(
-      record?.data ?? {},
+      record ? currentData(record) : {},
       data,
       Object.keys(diff.body),
-      this.diffContext
+      this.diffContext,
+      record?.data
     )
     const mutation: PendingMutation = {
       id: this.queue.nextId(),

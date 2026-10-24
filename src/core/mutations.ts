@@ -196,18 +196,20 @@ export interface PatchDiff {
   dirty: Record<string, unknown>
 }
 
-/** Converts selected PATCH fields into a merge-patch delta in record form. */
+/** Converts PATCH fields to record form using visible and confirmed relation references. */
 export function recordPatchFor(
   current: Record<string, unknown>,
   data: Record<string, unknown>,
   keys: Iterable<string>,
-  context: DiffContext
+  context: DiffContext,
+  confirmed: Record<string, unknown> = current
 ): Record<string, unknown> {
   const patch: Record<string, unknown> = {}
   for (const key of keys) {
     const value = data[key]
     if (key === '_meta' || typeof value === 'function' || value === undefined) continue
-    patch[key] = toRecordPatchValue(current[key], value, context)
+    const reference = isRelationRef(current[key]) ? current[key] : confirmed[key]
+    patch[key] = toRecordPatchValue(reference, value, context)
   }
   return patch
 }

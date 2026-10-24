@@ -10,7 +10,8 @@ All notable changes to this project are documented in this file. The format is b
 
 - Reapply pending nested PATCH changes after rollback and on 204 responses without restoring
   failed changes or overwriting confirmed server values.
-- Keep recomputed optimistic objects read-only and relations callable after a pending clear.
+- Keep recomputed optimistic objects read-only and relations callable across overlapping changes
+  and server-side clears.
 - Apply nested merge patches to null, missing, array and scalar values using an empty object.
 
 ## [1.0.0] - 2026-10-24

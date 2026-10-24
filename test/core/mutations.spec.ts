@@ -4,6 +4,7 @@ import {
   diffForPatch,
   mergePatch,
   MutationQueue,
+  recordPatchFor,
 } from '../../src/core/mutations.js'
 import type { EntityRecord } from '../../src/core/records.js'
 import { createUriNormalizer } from '../../src/core/uri.js'
@@ -98,6 +99,38 @@ describe('bodyForPost', () => {
       title: 't',
     })
   })
+})
+
+describe('recordPatchFor', () => {
+  it.each(['visible', 'confirmed'])(
+    'normalizes to-one and to-many relations from the %s state',
+    (source) => {
+      const references = {
+        author: { href: '/authors/1' },
+        chapters: { hrefs: ['/chapters/1'] },
+      }
+      const cleared = { author: null, chapters: null }
+      const data = {
+        author: wrapper('/authors/2'),
+        chapters: [wrapper('/chapters/2')],
+        title: '/somewhere',
+      }
+
+      expect(
+        recordPatchFor(
+          source === 'visible' ? references : cleared,
+          data,
+          Object.keys(data),
+          context,
+          source === 'confirmed' ? references : cleared
+        )
+      ).toEqual({
+        author: { href: '/authors/2' },
+        chapters: { hrefs: ['/chapters/2'] },
+        title: '/somewhere',
+      })
+    }
+  )
 })
 
 describe('MutationQueue', () => {
